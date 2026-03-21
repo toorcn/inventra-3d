@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# InventorNet
+
+InventorNet is a Next.js app for exploring breakthrough inventions around the world through an interactive 3D globe, rich invention briefs, an interactive 3D “exploded view” for select inventions, and an AI “expert” chat panel for contextual explanations.
+
+## What you can do
+
+- **Browse a 3D globe** and click countries to focus the dataset.
+- **Filter by category** (energy, computing, biology, materials, etc.).
+- **Search in plain language** (e.g. “renewable energy in Europe”, “after 1950 in the US”).
+- **Open an invention detail page** with a story/brief.
+- **Explore select inventions in 3D** with component picking and an exploded view.
+- **Ask the AI Expert** questions about the invention or a selected component.
+
+> Note: without an API key, chat/search fall back to offline heuristics and a baseline response.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js (recommended: latest LTS)
+
+### Install & run
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuration (optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env.local` in the project root:
 
-## Learn More
+```bash
+# Enables real AI responses via OpenRouter (chat + structured search parsing).
+OPENROUTER_API_KEY=...
 
-To learn more about Next.js, take a look at the following resources:
+# Used for OpenRouter headers (optional).
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev        # start dev server
+npm run build      # production build
+npm run start      # start production server
+npm test           # run vitest once
+npm run test:watch # vitest in watch mode
+```
 
-## Deploy on Vercel
+## Tech overview
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework**: Next.js (App Router), React
+- **3D globe**: `react-globe.gl` (client-only)
+- **3D models / exploded view**: React Three Fiber + drei + three
+- **UI**: Tailwind CSS
+- **AI**: OpenRouter (server route at `src/app/api/chat/route.ts`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project structure
+
+- `src/app/page.tsx`: globe + discovery side panel
+- `src/app/invention/[id]/page.tsx`: invention detail + 3D viewer + AI chat
+- `src/app/api/search/route.ts`: search endpoint (filters inventions)
+- `src/app/api/chat/route.ts`: AI chat endpoint (returns plain text)
+- `src/data/*`: invention dataset, categories, 3D component definitions
+
+## Notes
+
+- The globe loads its country geojson and textures from public GitHub URLs at runtime (`src/components/globe/GlobeClient.tsx`).
+- The “3D models” in this repo are procedural primitives (no `.glb` assets in `public/` by default).
+
+## Deploy
+
+This is a standard Next.js app—deploy to Vercel (or any Node-compatible platform) the same way you would deploy any Next.js project.
