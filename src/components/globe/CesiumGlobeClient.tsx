@@ -1,16 +1,29 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { Invention } from "@/types";
 import { inventions } from "@/data/inventions";
 import { categoryColorMap } from "@/data/categories";
+import type { GlobeCameraController } from "./camera-controller";
 
 interface CesiumGlobeClientProps {
   onInventionSelect: (invention: Invention) => void;
+  onCameraReady?: (controller: GlobeCameraController | null) => void;
   selectedInventionId?: string;
   temporosYear: number;
 }
+
+const DEFAULT_VIEW = {
+  lng: 0,
+  lat: 20,
+  height: 20000000,
+};
+
+const INVENTION_FOCUS_HEIGHT = 800000;
+const AUTO_ROTATE_RESUME_DELAY_MS = 3000;
+const INITIAL_AUTO_ROTATE_DELAY_MS = 500;
+const AUTO_ROTATE_RADIANS_PER_SECOND = 0.08;
 
 // Draw a glowing dot on a canvas and return it as an HTMLCanvasElement
 function createGlowingDotCanvas(color: string): HTMLCanvasElement {
@@ -51,14 +64,93 @@ function createGlowingDotCanvas(color: string): HTMLCanvasElement {
 
 export default function CesiumGlobeClient({
   onInventionSelect,
+  onCameraReady,
   selectedInventionId,
   temporosYear,
 }: CesiumGlobeClientProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const selectedInventionIdRef = useRef<string | undefined>(selectedInventionId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
+  const cesiumRef = useRef<typeof import("cesium") | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rippleEntitiesRef = useRef<any[]>([]);
+  const animationFrameRef = useRef<number | null>(null);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoRotateEnabledRef = useRef(false);
+  const userInteractingRef = useRef(false);
+
+  const clearResumeTimer = useCallback(() => {
+    if (!resumeTimerRef.current) return;
+    clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = null;
+  }, []);
+
+  const pauseAutoRotate = useCallback(() => {
+    autoRotateEnabledRef.current = false;
+    clearResumeTimer();
+  }, [clearResumeTimer]);
+
+  const resumeAutoRotateAfterDelay = useCallback((delayMs = AUTO_ROTATE_RESUME_DELAY_MS) => {
+    clearResumeTimer();
+    if (userInteractingRef.current) return;
+
+    resumeTimerRef.current = setTimeout(() => {
+      autoRotateEnabledRef.current = true;
+    }, delayMs);
+  }, [clearResumeTimer]);
+
+  const flyToCoordinates = useCallback((
+    lng: number,
+    lat: number,
+    height: number,
+    durationSeconds = 2,
+  ) => {
+    const Cesium = cesiumRef.current;
+    const v = viewerRef.current;
+    if (!Cesium || !v) return;
+
+    pauseAutoRotate();
+    v.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lng, lat, height),
+      duration: durationSeconds,
+      complete: () => {
+        resumeAutoRotateAfterDelay();
+      },
+      cancel: () => {
+        resumeAutoRotateAfterDelay();
+      },
+    });
+  }, [pauseAutoRotate, resumeAutoRotateAfterDelay]);
+
+  const flyToInvention = useCallback((invention: Invention) => {
+    flyToCoordinates(
+      invention.location.lng,
+      invention.location.lat,
+      INVENTION_FOCUS_HEIGHT,
+    );
+  }, [flyToCoordinates]);
+
+  const reset = useCallback(() => {
+    flyToCoordinates(DEFAULT_VIEW.lng, DEFAULT_VIEW.lat, DEFAULT_VIEW.height, 2.2);
+  }, [flyToCoordinates]);
+
+  useEffect(() => {
+    selectedInventionIdRef.current = selectedInventionId;
+  }, [selectedInventionId]);
+
+  useEffect(() => {
+    onCameraReady?.({
+      flyToInvention,
+      reset,
+      pauseAutoRotate,
+      resumeAutoRotateAfterDelay,
+    });
+
+    return () => {
+      onCameraReady?.(null);
+    };
+  }, [flyToInvention, onCameraReady, pauseAutoRotate, reset, resumeAutoRotateAfterDelay]);
 
   // Initialize Cesium viewer once
   useEffect(() => {
@@ -71,6 +163,7 @@ export default function CesiumGlobeClient({
 
     async function initCesium() {
       const Cesium = await import("cesium");
+      cesiumRef.current = Cesium;
 
       // Configure Ion token if available
       const ionToken = process.env.NEXT_PUBLIC_CESIUM_ION_ACCESS_TOKEN;
@@ -116,7 +209,11 @@ export default function CesiumGlobeClient({
 
       // Default camera position
       v.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(0, 20, 20000000),
+        destination: Cesium.Cartesian3.fromDegrees(
+          DEFAULT_VIEW.lng,
+          DEFAULT_VIEW.lat,
+          DEFAULT_VIEW.height,
+        ),
       });
 
       // Click handler
@@ -133,6 +230,7 @@ export default function CesiumGlobeClient({
               const inventionId = entity.properties.inventionId.getValue();
               const found = inventions.find((inv) => inv.id === inventionId);
               if (found) {
+                pauseAutoRotate();
                 onInventionSelect(found);
               }
             }
@@ -141,52 +239,139 @@ export default function CesiumGlobeClient({
         Cesium.ScreenSpaceEventType.LEFT_CLICK,
       );
 
+      const syncLabelVisibility = (hoveredEntity?: { label?: { show?: { setValue: (value: boolean) => void } } }) => {
+        v.entities.values.forEach((entity: {
+          label?: { show?: { setValue: (value: boolean) => void } };
+          properties?: { inventionId?: { getValue?: () => string } };
+        }) => {
+          if (!entity.label?.show) return;
+
+          const inventionId = entity.properties?.inventionId?.getValue?.();
+          entity.label.show.setValue(
+            entity === hoveredEntity || inventionId === selectedInventionIdRef.current,
+          );
+        });
+      };
+
       // Hover handler — show/hide labels
       v.screenSpaceEventHandler.setInputAction(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (movement: any) => {
           const picked = v.scene.pick(movement.endPosition);
-          // Hide all labels first
-          v.entities.values.forEach((entity: { label?: { show?: { setValue: (v: boolean) => void } } }) => {
-            if (entity.label && entity.label.show) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (entity.label.show as any).setValue(false);
-            }
-          });
-          // Show label on hovered entity
           if (Cesium.defined(picked) && picked.id) {
-            const entity = picked.id;
-            if (entity.label && entity.label.show) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (entity.label.show as any).setValue(true);
-            }
+            syncLabelVisibility(picked.id);
+            return;
           }
+          syncLabelVisibility();
         },
         Cesium.ScreenSpaceEventType.MOUSE_MOVE,
       );
+
+      const handleInteractionStart = () => {
+        userInteractingRef.current = true;
+        pauseAutoRotate();
+      };
+
+      const handleInteractionEnd = () => {
+        userInteractingRef.current = false;
+        resumeAutoRotateAfterDelay();
+      };
+
+      const handleWheel = () => {
+        pauseAutoRotate();
+        resumeAutoRotateAfterDelay();
+      };
+
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionStart,
+        Cesium.ScreenSpaceEventType.LEFT_DOWN,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionStart,
+        Cesium.ScreenSpaceEventType.MIDDLE_DOWN,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionStart,
+        Cesium.ScreenSpaceEventType.RIGHT_DOWN,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionStart,
+        Cesium.ScreenSpaceEventType.PINCH_START,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionEnd,
+        Cesium.ScreenSpaceEventType.LEFT_UP,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionEnd,
+        Cesium.ScreenSpaceEventType.MIDDLE_UP,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionEnd,
+        Cesium.ScreenSpaceEventType.RIGHT_UP,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleInteractionEnd,
+        Cesium.ScreenSpaceEventType.PINCH_END,
+      );
+      v.screenSpaceEventHandler.setInputAction(
+        handleWheel,
+        Cesium.ScreenSpaceEventType.WHEEL,
+      );
+
+      let lastFrameTime = performance.now();
+      const animate = (timestamp: number) => {
+        lastFrameTime ||= timestamp;
+        const deltaSeconds = Math.min((timestamp - lastFrameTime) / 1000, 0.05);
+        lastFrameTime = timestamp;
+
+        if (
+          autoRotateEnabledRef.current &&
+          !userInteractingRef.current &&
+          viewerRef.current &&
+          !viewerRef.current.isDestroyed()
+        ) {
+          viewerRef.current.camera.rotate(
+            Cesium.Cartesian3.UNIT_Z,
+            -AUTO_ROTATE_RADIANS_PER_SECOND * deltaSeconds,
+          );
+        }
+
+        animationFrameRef.current = window.requestAnimationFrame(animate);
+      };
+
+      animationFrameRef.current = window.requestAnimationFrame(animate);
+      resumeAutoRotateAfterDelay(INITIAL_AUTO_ROTATE_DELAY_MS);
     }
 
     initCesium().catch(console.error);
 
     return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+      clearResumeTimer();
+      autoRotateEnabledRef.current = false;
+      userInteractingRef.current = false;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const v = viewer as any;
       if (v && !v.isDestroyed()) {
         v.destroy();
       }
       viewerRef.current = null;
+      cesiumRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [clearResumeTimer, onInventionSelect, pauseAutoRotate, resumeAutoRotateAfterDelay]);
 
   // Update markers when temporosYear changes
   useEffect(() => {
     const v = viewerRef.current;
-    if (!v) return;
+    const CesiumModule = cesiumRef.current;
+    if (!v || !CesiumModule) return;
+    const Cesium = CesiumModule;
 
-    async function updateMarkers() {
-      const Cesium = await import("cesium");
-
+    function updateMarkers() {
       // Remove existing invention entities and ripple entities
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const toRemove = v.entities.values.filter((e: any) =>
@@ -205,6 +390,7 @@ export default function CesiumGlobeClient({
         const color = categoryColorMap[inv.category] ?? "#ffffff";
         const cesiumColor = Cesium.Color.fromCssColorString(color);
         const dotCanvas = createGlowingDotCanvas(color);
+        const isSelected = inv.id === selectedInventionId;
 
         const position = Cesium.Cartesian3.fromDegrees(
           inv.location.lng,
@@ -217,22 +403,24 @@ export default function CesiumGlobeClient({
           position,
           billboard: {
             image: dotCanvas,
-            width: 32,
-            height: 32,
+            width: isSelected ? 40 : 32,
+            height: isSelected ? 40 : 32,
             verticalOrigin: Cesium.VerticalOrigin.CENTER,
             horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
           label: {
             text: `${inv.title} (${inv.year})`,
             font: "12px sans-serif",
-            fillColor: Cesium.Color.WHITE,
+            fillColor: isSelected ? cesiumColor.brighten(0.3, new Cesium.Color()) : Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
             pixelOffset: new Cesium.Cartesian2(0, -40),
-            show: false,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            show: isSelected,
           },
           properties: {
             inventionId: inv.id,
@@ -268,31 +456,8 @@ export default function CesiumGlobeClient({
       }
     }
 
-    updateMarkers().catch(console.error);
-  }, [temporosYear]);
-
-  // Fly to selected invention when selectedInventionId changes
-  useEffect(() => {
-    const v = viewerRef.current;
-    if (!v || !selectedInventionId) return;
-
-    async function flyToSelected() {
-      const Cesium = await import("cesium");
-      const inv = inventions.find((i) => i.id === selectedInventionId);
-      if (!inv) return;
-
-      v.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(
-          inv.location.lng,
-          inv.location.lat,
-          800000,
-        ),
-        duration: 2.0,
-      });
-    }
-
-    flyToSelected().catch(console.error);
-  }, [selectedInventionId]);
+    updateMarkers();
+  }, [selectedInventionId, temporosYear]);
 
   return (
     <div

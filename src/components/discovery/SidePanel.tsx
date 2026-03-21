@@ -59,11 +59,6 @@ export function SidePanel({
 
         if (data.inventionId) {
           onSelectInvention(data.inventionId);
-          window.dispatchEvent(
-            new CustomEvent("exaSearchResult", {
-              detail: { lat: data.lat, lng: data.lng, regionName: data.regionName },
-            }),
-          );
         }
       }
     } catch (err) {

@@ -4,15 +4,22 @@ import CesiumGlobe from "@/components/globe/CesiumGlobe";
 import TemporosSlider from "@/components/globe/TemporosSlider";
 import { DemoMode } from "@/components/demo/DemoMode";
 import { SidePanel } from "@/components/discovery/SidePanel";
+import type { GlobeCameraController } from "@/components/globe/camera-controller";
 import { ViewTransition } from "@/components/transitions/ViewTransition";
 import HolographicViewer from "@/components/viewer/HolographicViewer";
 import { useInventions } from "@/hooks/useInventions";
+import {
+  focusInvention,
+  focusInventionById,
+  resetDiscoveryView,
+} from "@/lib/globe-discovery";
 import type { Invention, InventionComponent } from "@/types";
 import { Play, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export default function Home() {
   const inventionState = useInventions();
+  const globeCameraRef = useRef<GlobeCameraController | null>(null);
   const [demoRunning, setDemoRunning] = useState(false);
   const [temporosYear, setTemporosYear] = useState(2025);
 
@@ -24,14 +31,33 @@ export default function Home() {
   const [pendingInvention, setPendingInvention] = useState<Invention | null>(null);
   const [pendingMode, setPendingMode] = useState<"globe" | "viewer">("viewer");
 
-  const handleInventionSelect = (invention: Invention) => {
-    inventionState.selectInvention(invention.id);
-  };
+  const handleInventionSelect = useCallback((invention: Invention) => {
+    focusInvention(invention, inventionState.selectInvention, globeCameraRef.current);
+  }, [inventionState.selectInvention]);
 
-  const handleReset = () => {
-    inventionState.resetFilters();
-    setTemporosYear(2025);
-  };
+  const handleSidePanelSelect = useCallback((inventionId: string | null) => {
+    focusInventionById(
+      inventionId,
+      inventionState.inventions,
+      inventionState.selectInvention,
+      globeCameraRef.current,
+    );
+  }, [inventionState.inventions, inventionState.selectInvention]);
+
+  const handleReset = useCallback(() => {
+    resetDiscoveryView(
+      inventionState.resetFilters,
+      setTemporosYear,
+      globeCameraRef.current,
+    );
+  }, [inventionState.resetFilters]);
+
+  const handleCameraReady = useCallback((controller: GlobeCameraController | null) => {
+    globeCameraRef.current = controller;
+    if (controller && inventionState.selectedInvention) {
+      controller.flyToInvention(inventionState.selectedInvention);
+    }
+  }, [inventionState.selectedInvention]);
 
   // Enter the holographic viewer with a fade transition
   const handleEnterViewer = useCallback((invention: Invention) => {
@@ -107,6 +133,7 @@ export default function Home() {
           <div className="absolute inset-0 pr-[26rem]">
             <CesiumGlobe
               onInventionSelect={handleInventionSelect}
+              onCameraReady={handleCameraReady}
               selectedInventionId={inventionState.selectedInvention?.id}
               temporosYear={temporosYear}
             />
@@ -119,7 +146,7 @@ export default function Home() {
               activeCategories={inventionState.activeCategories}
               onToggleCategory={inventionState.toggleCategory}
               selectedInvention={inventionState.selectedInvention}
-              onSelectInvention={(id) => inventionState.selectInvention(id)}
+              onSelectInvention={handleSidePanelSelect}
               searchValue={inventionState.searchQuery}
               onSearchChange={inventionState.setSearchQuery}
               onSearchSubmit={(q) => inventionState.setSearchQuery(q)}
