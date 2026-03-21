@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useHandGestures } from "@/hooks/useHandGestures";
 import { WebcamLayer } from "./WebcamLayer";
+import ComponentLabels from "./ComponentLabels";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import type { Invention, InventionComponent } from "@/types";
 
@@ -34,6 +35,10 @@ export default function HolographicViewerClient({
   const { videoRef, isReady: webcamReady, error: webcamError } = useWebcam();
   const gestureState = useHandGestures(videoRef, webcamReady);
 
+  // Selected component state
+  const [selectedComponent, setSelectedComponent] = useState<InventionComponent | null>(null);
+  const [isExploded, setIsExploded] = useState(false);
+
   // Three.js refs
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -43,9 +48,17 @@ export default function HolographicViewerClient({
   const animFrameRef = useRef<number>(0);
   const isExplodedRef = useRef(false);
 
+  // Expose Three.js objects as state for ComponentLabels
+  const [threeScene, setThreeScene] = useState<THREE.Scene | null>(null);
+  const [threeCamera, setThreeCamera] = useState<THREE.PerspectiveCamera | null>(null);
+  const [threeRenderer, setThreeRenderer] = useState<THREE.WebGLRenderer | null>(null);
+
+  const components = getComponentsByInventionId(invention.id);
+
   // Explode / assemble helpers
   const triggerExplode = useCallback(() => {
     isExplodedRef.current = true;
+    setIsExploded(true);
     meshesRef.current.forEach((mesh) => {
       const ud = mesh.userData as MeshUserData;
       ud.targetPos.copy(ud.originalPos).add(
@@ -60,6 +73,7 @@ export default function HolographicViewerClient({
 
   const triggerAssemble = useCallback(() => {
     isExplodedRef.current = false;
+    setIsExploded(false);
     meshesRef.current.forEach((mesh) => {
       const ud = mesh.userData as MeshUserData;
       ud.targetPos.copy(ud.originalPos);
@@ -87,15 +101,18 @@ export default function HolographicViewerClient({
     renderer.domElement.style.height = "100%";
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+    setThreeRenderer(renderer);
 
     // ── Scene & Camera ────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     sceneRef.current = scene;
+    setThreeScene(scene);
 
     const camera = new THREE.PerspectiveCamera(50, (w || 1280) / (h || 720), 0.1, 100);
     camera.position.set(0, 1, 3);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
+    setThreeCamera(camera);
 
     // ── Lights ────────────────────────────────────────────────────────────────
     const ambient = new THREE.AmbientLight(0xffffff, 0.8);
@@ -121,8 +138,6 @@ export default function HolographicViewerClient({
     const modelGroup = new THREE.Group();
     scene.add(modelGroup);
     modelGroupRef.current = modelGroup;
-
-    const components = getComponentsByInventionId(invention.id);
 
     // Build name→component map for GLB mesh matching
     const componentByName: Record<string, InventionComponent> = {};
@@ -220,6 +235,9 @@ export default function HolographicViewerClient({
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
+      setThreeScene(null);
+      setThreeCamera(null);
+      setThreeRenderer(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invention.id]);
@@ -311,7 +329,21 @@ export default function HolographicViewerClient({
 
       {/* Layer 2 — Three.js canvas injected by useEffect */}
 
-      {/* Layer 3 — UI Overlays */}
+      {/* Layer 3 — Component Labels */}
+      <ComponentLabels
+        components={components}
+        scene={threeScene}
+        camera={threeCamera}
+        renderer={threeRenderer}
+        isExploded={isExploded}
+        selectedComponentId={selectedComponent?.id ?? null}
+        onSelect={(component) => {
+          setSelectedComponent(component);
+          onComponentSelect(component);
+        }}
+      />
+
+      {/* Layer 4 — UI Overlays */}
 
       {/* Gesture confidence HUD — top-center */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-mono text-white/60">
