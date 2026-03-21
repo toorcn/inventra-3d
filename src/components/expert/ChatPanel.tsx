@@ -3,9 +3,10 @@
 import { ExpertAvatar } from "./ExpertAvatar";
 import { MessageBubble } from "./MessageBubble";
 import { SuggestedQuestions } from "./SuggestedQuestions";
+import { useAgoraVoice } from "@/hooks/useAgoraVoice";
 import { useExpert } from "@/hooks/useExpert";
 import type { ExpertAction } from "@/types";
-import { Send } from "lucide-react";
+import { LoaderCircle, Mic, MicOff, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ChatPanelProps {
@@ -19,6 +20,16 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
     inventionId,
     componentId,
     onActions,
+  });
+  const {
+    error: voiceError,
+    isActive: isVoiceActive,
+    isConnecting: isVoiceConnecting,
+    startVoice,
+    stopVoice,
+  } = useAgoraVoice({
+    inventionId,
+    componentId,
   });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -41,13 +52,50 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
         <div>
           <h3 className="text-sm font-semibold text-white">AI Expert</h3>
           <p className="text-xs text-[var(--text-secondary)]">
-            {isSpeaking ? "Thinking..." : "Ask me anything"}
+            {isVoiceActive
+              ? "Voice session live"
+              : isVoiceConnecting
+                ? "Joining Agora voice..."
+                : isSpeaking
+                  ? "Thinking..."
+                  : "Ask me anything"}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (isVoiceActive) {
+              void stopVoice();
+              return;
+            }
+            void startVoice();
+          }}
+          disabled={isVoiceConnecting}
+          className="ml-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+        >
+          {isVoiceConnecting ? (
+            <LoaderCircle className="size-4 animate-spin" />
+          ) : isVoiceActive ? (
+            <MicOff className="size-4" />
+          ) : (
+            <Mic className="size-4" />
+          )}
+          {isVoiceActive ? "Stop voice" : "Start voice"}
+        </button>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-3">
+          {voiceError && (
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+              Voice mode could not start: {voiceError}
+            </div>
+          )}
+          {isVoiceActive && (
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-xs text-cyan-100">
+              Agora voice is live. Spoken replies come from the voice agent, while typed questions still drive the visual tool actions.
+            </div>
+          )}
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}

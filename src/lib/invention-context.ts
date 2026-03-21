@@ -43,3 +43,19 @@ export function buildInventionContext(
 
   return lines.join("\n");
 }
+
+export function buildVoiceAgentContext(
+  invention: Invention,
+  component?: InventionComponent,
+): string {
+  const lines = [
+    buildInventionContext(invention, component),
+    "This conversation is happening over live voice.",
+    "Speak naturally and keep each response concise enough for audio delivery.",
+    "Avoid markdown, bullet points, or JSON in spoken replies.",
+    "If the user asks for a visual walkthrough, describe which parts to inspect rather than mentioning hidden tools.",
+    "If you are unsure, say so briefly and stay grounded in the invention context above.",
+  ];
+
+  return lines.join("\n");
+}
