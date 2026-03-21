@@ -10,6 +10,7 @@ import {
   type PatentFigure,
   type PatentFigureComponent,
   type PatentFigureComponentDetection,
+  type PatentScaleHints,
 } from "@/lib/patent-workspace";
 import { ensurePatentWorkspaceDirectories, writePatentWorkspaceManifest } from "@/lib/patent-workspace-store";
 
@@ -124,6 +125,20 @@ function normalizeRegion(region: NormalizedRegion): NormalizedRegion {
   };
 }
 
+function expandRegion(region: NormalizedRegion, padding = 0.08): NormalizedRegion {
+  const xPad = region.width * padding;
+  const yPad = region.height * padding;
+
+  return normalizeRegion({
+    x: region.x - xPad,
+    y: region.y - yPad,
+    width: region.width + xPad * 2,
+    height: region.height + yPad * 2,
+    label: region.label,
+    confidence: region.confidence,
+  });
+}
+
 function pickBestRegion(regions: NormalizedRegion[]): NormalizedRegion | null {
   const valid = regions
     .map(normalizeRegion)
@@ -175,6 +190,108 @@ async function cropImageByRegion(imageBuffer: Buffer, region: NormalizedRegion):
   return canvas.toBuffer("image/png");
 }
 
+function buildScaleHints(region: NormalizedRegion | null): PatentScaleHints | undefined {
+  if (!region) {
+    return undefined;
+  }
+
+  return {
+    normalizedWidth: region.width,
+    normalizedHeight: region.height,
+    relativeArea: region.width * region.height,
+  };
+}
+
+function isGenericCandidateName(name: string): boolean {
+  return new Set(["component", "portion", "part", "member", "section", "device"]).has(name.trim().toLowerCase());
+}
+
+async function analyzeCropQuality(imageBuffer: Buffer): Promise<{ score: number; issues: string[] }> {
+  const image = (await loadImage(imageBuffer)) as unknown as CanvasImage;
+  const width = Math.max(1, image.width);
+  const height = Math.max(1, image.height);
+  const canvas = createCanvas(width, height);
+  const context = canvas.getContext("2d") as Canvas2DContext;
+
+  context.drawImage(image as unknown as Parameters<Canvas2DContext["drawImage"]>[0], 0, 0, width, height);
+  const imageData = context.getImageData(0, 0, width, height).data;
+
+  let nonWhitePixels = 0;
+  let darkPixels = 0;
+
+  for (let index = 0; index < imageData.length; index += 4) {
+    const r = imageData[index] ?? 255;
+    const g = imageData[index + 1] ?? 255;
+    const b = imageData[index + 2] ?? 255;
+    const brightness = (r + g + b) / 3;
+
+    if (brightness < 245) {
+      nonWhitePixels += 1;
+    }
+
+    if (brightness < 210) {
+      darkPixels += 1;
+    }
+  }
+
+  const totalPixels = Math.max(1, width * height);
+  const nonWhiteRatio = nonWhitePixels / totalPixels;
+  const darkRatio = darkPixels / totalPixels;
+  const aspectRatio = width / height;
+  const issues: string[] = [];
+  let score = 0.9;
+
+  if (nonWhiteRatio < 0.01) {
+    issues.push("blank_crop");
+    score -= 0.65;
+  } else if (nonWhiteRatio < 0.03) {
+    score -= 0.2;
+  }
+
+  if (aspectRatio > 7 || aspectRatio < 0.14) {
+    issues.push("text_heavy");
+    score -= 0.35;
+  }
+
+  if (darkRatio < 0.012) {
+    score -= 0.12;
+  }
+
+  if (width < 72 || height < 72) {
+    issues.push("tiny_crop");
+    score -= 0.18;
+  }
+
+  return {
+    score: Math.max(0, Math.min(1, score)),
+    issues,
+  };
+}
+
+function shouldKeepDetection(
+  name: string,
+  quality: { score: number; issues: string[] },
+  region: NormalizedRegion | null,
+): boolean {
+  if (quality.issues.includes("blank_crop")) {
+    return false;
+  }
+
+  if (quality.issues.includes("text_heavy") && quality.score < 0.48) {
+    return false;
+  }
+
+  if (region && region.width * region.height < 0.004) {
+    return false;
+  }
+
+  if (isGenericCandidateName(name) && quality.score < 0.5) {
+    return false;
+  }
+
+  return true;
+}
+
 function slugify(input: string): string {
   return input
     .trim()
@@ -220,6 +337,84 @@ function getOpenRouterHeaders(): HeadersInit {
     "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
     "X-Title": "InventorNet",
   };
+}
+
+function buildPatentFigureAnalysisPrompt(pageText: string): string {
+  return [
+    "Analyze this patent page image for staged patent-to-product extraction.",
+    "Stage 1: infer what product or embodiment this page belongs to.",
+    "Stage 2: decide whether this page is a full product view, subassembly view, component detail, auxiliary/tooling/process view, or mostly text.",
+    "Return isTextOnlyPage=true when the page is mostly prose and should not be exported as an image.",
+    "If it is a figure page, extract visible figure labels (e.g., FIG. 1, FIG. 2A), a short figure description, and component evidence.",
+    "Return figureRegions as normalized bounding boxes [x,y,width,height] for whole diagram areas only.",
+    "Return componentRegions for distinct visible manufacturable parts or subassemblies within the figure.",
+    "Only create multiple componentRegions when the image clearly shows separate parts worth preserving independently.",
+    "Do not overfit to sectional fragments. Prefer patent-specific part names over generic local names like left section, base, portion, or housing when a more specific identity is inferable.",
+    "For each component or componentRegion, provide a concise specific name, what it is, how it works in the patent, refNumber if visible, confidence 0..1, and kind.",
+    "Use kind='full_product' only for the overall product view, kind='subassembly' for multi-part groupings, and kind='component' for leaf parts.",
+    "Indicate only manufacturable or build-relevant items; avoid splitting a page into arbitrary geometric fragments.",
+    "Coordinates are 0..1 relative to the full page image.",
+    "",
+    "Page OCR/Text context:",
+    pageText.slice(0, 2800),
+  ].join("\n");
+}
+
+async function supplementPageTextWithVision(imageBuffer: Buffer): Promise<string | null> {
+  if (!hasOpenRouterApiKey()) {
+    return null;
+  }
+
+  const imageDataUrl = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: getOpenRouterHeaders(),
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      temperature: 0,
+      max_tokens: 220,
+      messages: [
+        {
+          role: "system",
+          content: "You extract concise OCR-like patent context. Return plain text only.",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: [
+                "Read this patent page image and return a concise plain-text context block.",
+                "Prefer visible figure labels, part names, reference numbers, captions, and a short product/assembly description.",
+                "Do not explain your reasoning and do not output markdown.",
+                "Keep it under 700 characters.",
+              ].join("\n"),
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageDataUrl,
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{
+      message?: {
+        content?: string;
+      };
+    }>;
+  };
+
+  return payload.choices?.[0]?.message?.content?.trim() || null;
 }
 
 async function analyzeFigureWithVision(imageBuffer: Buffer, pageText: string): Promise<VisionAnalysisResult> {
@@ -319,22 +514,7 @@ async function analyzeFigureWithVision(imageBuffer: Buffer, pageText: string): P
     additionalProperties: false,
   };
 
-  const prompt = [
-    "Analyze this patent page image for later component extraction and 3D assembly planning.",
-    "Decide if this page is primarily a patent figure/diagram (not prose-heavy claims/spec text).",
-    "Return isTextOnlyPage=true when the page is mostly text/prose and should not be exported as an image.",
-    "If it is a figure page, extract visible figure labels (e.g., FIG. 1, FIG. 2A), a short figure description, and component evidence.",
-    "Return figureRegions as normalized bounding boxes [x,y,width,height] for whole diagram areas only.",
-    "Return componentRegions for distinct visible manufacturable parts or subassemblies within the figure.",
-    "Only create multiple componentRegions when the image clearly shows separate parts worth preserving independently.",
-    "For each component or componentRegion, provide a concise specific name, what it is, how it works in the patent, refNumber if visible, confidence 0..1, and kind.",
-    "Use kind='full_product' only for the full product view, 'subassembly' for multi-part groupings, and 'component' for leaf parts.",
-    "Avoid generic names like component, portion, or device unless absolutely necessary.",
-    "Coordinates are 0..1 relative to the full page image.",
-    "",
-    "Page OCR/Text context:",
-    pageText.slice(0, 2800),
-  ].join("\n");
+  const prompt = buildPatentFigureAnalysisPrompt(pageText);
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -500,6 +680,7 @@ function buildFallbackRegions(
   figureImagePath: string,
   components: VisionComponent[],
   figureCropRegion: NormalizedRegion | null,
+  figureQuality: { score: number; issues: string[] },
 ): PatentFigureComponentDetection[] {
   return components.slice(0, 8).map((component, index) => ({
     id: `${figureId}-component-${index + 1}`,
@@ -513,6 +694,9 @@ function buildFallbackRegions(
     imageFilename: figureFilename,
     imagePath: figureImagePath,
     sourceFigureId: figureId,
+    qualityScore: figureQuality.score,
+    qualityIssues: figureQuality.issues,
+    scaleHints: buildScaleHints(figureCropRegion),
   }));
 }
 
@@ -548,7 +732,10 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
   for (let pageNumber = 1; pageNumber <= pagesToProcess; pageNumber += 1) {
     try {
       const page = await pdf.getPage(pageNumber);
-      const pageText = await extractPageText(page);
+      const imageBuffer = await renderPagePng(page);
+      const extractedPageText = await extractPageText(page);
+      const pageText =
+        extractedPageText.trim() || (await supplementPageTextWithVision(imageBuffer)) || extractedPageText;
       pagesText.push(pageText);
 
       const likelyCandidate = extractFigureLabels(pageText).length > 0 || pageText.split(/\s+/).length < 120;
@@ -556,7 +743,6 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
         continue;
       }
 
-      const imageBuffer = await renderPagePng(page);
       const visionResult = await analyzeFigureWithVision(imageBuffer, pageText);
       const analysis = visionResult.analysis ?? fallbackHeuristic(pageText);
       const analysisSource: "vision" | "heuristic" = visionResult.analysis ? "vision" : "heuristic";
@@ -576,8 +762,10 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
       const figureImagePath = `${diskPaths.publicPaths.outputDirectory}/${filename}`;
 
       const cropRegion = pickBestRegion(analysis.figureRegions);
-      const imageToWrite = cropRegion ? await cropImageByRegion(imageBuffer, cropRegion) : imageBuffer;
+      const expandedFigureRegion = cropRegion ? expandRegion(cropRegion, 0.04) : null;
+      const imageToWrite = expandedFigureRegion ? await cropImageByRegion(imageBuffer, expandedFigureRegion) : imageBuffer;
       await writeFile(figureAbsolutePath, imageToWrite);
+      const figureQuality = await analyzeCropQuality(imageToWrite);
 
       const detectionInputs =
         analysis.componentRegions.length > 0
@@ -607,8 +795,14 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
         let imageFilename = filename;
         let imagePath = figureImagePath;
 
+        let quality = figureQuality;
         if (detectionRegion) {
-          const detectionBuffer = await cropImageByRegion(imageBuffer, detectionRegion);
+          const paddedRegion = expandRegion(detectionRegion, 0.1);
+          const detectionBuffer = await cropImageByRegion(imageBuffer, paddedRegion);
+          quality = await analyzeCropQuality(detectionBuffer);
+          if (!shouldKeepDetection(detection.name, quality, paddedRegion)) {
+            continue;
+          }
           imageFilename = `candidate-p${pageNumber}-${safeLabel}-${componentToken}.png`;
           const candidateAbsolutePath = path.join(diskPaths.candidateAbsoluteDirectory, imageFilename);
           await writeFile(candidateAbsolutePath, detectionBuffer);
@@ -628,6 +822,9 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
           imageFilename,
           imagePath,
           sourceFigureId: `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
+          qualityScore: quality.score,
+          qualityIssues: quality.issues,
+          scaleHints: buildScaleHints(detectionRegion),
         });
       }
 
@@ -640,7 +837,8 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
               filename,
               figureImagePath,
               analysis.components,
-              cropRegion,
+              expandedFigureRegion,
+              figureQuality,
             );
 
       figures.push({
@@ -650,9 +848,12 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
         pageNumber,
         label,
         description: analysis.description.trim() || "Patent figure page",
+        role: "irrelevant",
+        relationToRootProduct: "Awaiting patent-level product planning.",
+        assemblyHint: null,
         analysisSource,
         failureReason,
-        cropRegion,
+        cropRegion: expandedFigureRegion,
         components: dedupeFigureComponents(analysis.components),
         componentDetections: fallbackDetections,
         pageTextSnippet: pageText.slice(0, 500),

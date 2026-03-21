@@ -9,6 +9,7 @@ import {
   updatePatentComponentGeneration,
   type PatentComponentRecord,
   type PatentGeneratedAsset,
+  type PatentWorkspaceManifest,
 } from "@/lib/patent-workspace";
 import {
   ensurePatentWorkspaceDirectories,
@@ -71,14 +72,31 @@ function getComponentOrThrow(workspace: { componentLibrary: PatentComponentRecor
   return component;
 }
 
-async function generateAsset(workspacePatentId: string, component: PatentComponentRecord): Promise<PatentGeneratedAsset> {
+async function generateAsset(
+  workspacePatentId: string,
+  workspace: PatentWorkspaceManifest,
+  component: PatentComponentRecord,
+): Promise<PatentGeneratedAsset> {
   const diskPaths = await ensurePatentWorkspaceDirectories(workspacePatentId);
   const evidence = [...component.evidence]
-    .sort((a, b) => b.confidence - a.confidence || a.pageNumber - b.pageNumber)
+    .sort(
+      (a, b) =>
+        (b.qualityScore ?? 0.5) - (a.qualityScore ?? 0.5) ||
+        b.confidence - a.confidence ||
+        a.pageNumber - b.pageNumber,
+    )
     .slice(0, 3);
-
+  const supportingFigureIds = component.supportingContext?.supportingFigureIds ?? component.evidence.map((item) => item.figureId);
+  const figureFallbackImages = workspace.figures
+    .filter((figure) => supportingFigureIds.includes(figure.id))
+    .slice(0, component.evidenceMode === "contextual_inferred" ? 2 : 1)
+    .map((figure) => ({
+      imagePath: figure.imagePath,
+      imageFilename: figure.filename,
+    }));
+  const referenceImageSources = [...evidence, ...figureFallbackImages].slice(0, 3);
   const referenceImages = await Promise.all(
-    evidence.map(async (item) => {
+    referenceImageSources.map(async (item) => {
       const absolutePath = path.join(process.cwd(), "public", item.imagePath.replace(/^\/+/, ""));
       return {
         imageBuffer: await readFile(absolutePath),
@@ -90,11 +108,25 @@ async function generateAsset(workspacePatentId: string, component: PatentCompone
   async function runGenerationAttempt(): Promise<PatentGeneratedAsset> {
     const generated = await enhancePatentComponentImage({
       canonicalName: component.canonicalName,
+      canonicalLabel: component.canonicalLabel ?? component.canonicalName,
+      canonicalRefNumber: component.canonicalRefNumber ?? component.refNumbers[0] ?? null,
       kind: component.kind,
+      componentRole: component.role ?? "core",
+      buildableStatus: component.buildableStatus ?? "buildable",
+      evidenceMode: component.evidenceMode ?? "figure_context",
+      inferenceStatus: component.inferenceStatus ?? "partial",
       summary: component.summary,
       functionDescription: component.functionDescription,
       refNumbers: component.refNumbers,
-      supportingFigures: component.evidence.map((item) => item.figureLabel),
+      supportingFigures: component.supportingContext?.supportingFigureLabels ?? component.evidence.map((item) => item.figureLabel),
+      rootProductName: component.supportingContext?.rootProductName ?? component.canonicalName,
+      rootProductDescription: component.supportingContext?.rootProductDescription ?? component.summary,
+      parentAssemblyName: component.supportingContext?.parentAssemblyName ?? null,
+      relatedComponentNames: component.supportingContext?.relatedComponentNames ?? [],
+      assemblyChildRefNumbers: component.supportingContext?.assemblyChildRefNumbers ?? [],
+      textSnippets: component.supportingContext?.textSnippets ?? [],
+      evidencePolicyNote:
+        component.supportingContext?.evidencePolicyNote ?? "Use the available patent evidence as the primary grounding.",
       referenceImages,
     });
 
@@ -167,7 +199,7 @@ export async function POST(request: Request): Promise<Response> {
       await writePatentWorkspaceManifest(workspace);
 
       try {
-        const generatedAsset = await generateAsset(patentId, getComponentOrThrow(workspace, componentId));
+        const generatedAsset = await generateAsset(patentId, workspace, getComponentOrThrow(workspace, componentId));
         workspace = updatePatentComponentGeneration(workspace, componentId, {
           generationStatus: "succeeded",
           generationError: null,
@@ -200,4 +232,3 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: message }, { status: 500 });
   }
 }
-

@@ -30,6 +30,9 @@ function buildWorkspace(): PatentWorkspaceManifest {
         pageNumber: 1,
         label: "FIG. 1",
         description: "Overview of the writing tip assembly.",
+        role: "irrelevant",
+        relationToRootProduct: "Awaiting patent-level product planning.",
+        assemblyHint: null,
         analysisSource: "vision",
         failureReason: null,
         cropRegion: null,
@@ -62,6 +65,19 @@ function buildWorkspace(): PatentWorkspaceManifest {
             imagePath: "/patents/sample-patent/components/candidates/candidate-seat.png",
             sourceFigureId: "fig-1",
           },
+          {
+            id: "fig-1-edge",
+            name: "front edge portion",
+            refNumber: "32",
+            summary: "Front edge portion of the tip seat 31.",
+            functionDescription: "Defines an edge feature on the tip seat 31.",
+            kind: "component",
+            confidence: 0.74,
+            region: null,
+            imageFilename: "candidate-edge.png",
+            imagePath: "/patents/sample-patent/components/candidates/candidate-edge.png",
+            sourceFigureId: "fig-1",
+          },
         ],
       },
       {
@@ -71,6 +87,9 @@ function buildWorkspace(): PatentWorkspaceManifest {
         pageNumber: 5,
         label: "FIG. 8",
         description: "Detail of the writing tip.",
+        role: "irrelevant",
+        relationToRootProduct: "Awaiting patent-level product planning.",
+        assemblyHint: null,
         analysisSource: "vision",
         failureReason: null,
         cropRegion: null,
@@ -99,16 +118,37 @@ function buildWorkspace(): PatentWorkspaceManifest {
 describe("createPatentWorkspaceManifest", () => {
   it("creates multiple raw candidates from a single figure", () => {
     const workspace = buildWorkspace();
-    expect(workspace.componentCandidates).toHaveLength(3);
+    expect(workspace.componentCandidates).toHaveLength(4);
   });
 
   it("collapses repeated part views into one canonical component", () => {
     const workspace = buildWorkspace();
     const tipComponent = workspace.componentLibrary.find((component) => component.refNumbers.includes("5"));
 
-    expect(workspace.componentLibrary).toHaveLength(2);
+    expect(workspace.componentLibrary).toHaveLength(3);
     expect(tipComponent?.evidence).toHaveLength(2);
-    expect(workspace.stats.rawCandidateCount).toBe(3);
+    expect(workspace.stats.rawCandidateCount).toBe(4);
+  });
+
+  it("creates a patent-level root product and non-empty assembly graph", () => {
+    const workspace = buildWorkspace();
+
+    expect(workspace.productModel.rootProductName).toBe("roller ball tip");
+    expect(workspace.featured.heroComponentId).toBeTruthy();
+    expect(workspace.featured.rootAssemblyId).toBe("sample-patent-full-product");
+    expect(workspace.featured.subassemblyAssemblyIds.length).toBeGreaterThan(0);
+    expect(workspace.assemblies.length).toBeGreaterThan(1);
+  });
+
+  it("builds a reference index and attaches feature-only refs to a parent", () => {
+    const workspace = buildWorkspace();
+    const edgeReference = workspace.referenceIndex.find((reference) => reference.refNumber === "32");
+    const edgeComponent = workspace.componentLibrary.find((component) => component.canonicalRefNumber === "32");
+
+    expect(edgeReference?.canonicalLabel).toBe("front edge portion");
+    expect(edgeComponent?.buildableStatus).toBe("feature_only");
+    expect(edgeComponent?.reviewStatus).toBe("redundant");
+    expect(edgeComponent?.mergeTargetId).toBeTruthy();
   });
 });
 
@@ -142,7 +182,7 @@ describe("updatePatentComponentGeneration", () => {
       generatedAsset: {
         outputPath: "/patents/sample-patent/components/generated/tip.png",
         outputFilename: "tip.png",
-        model: "gemini-3.1-flash-image-preview",
+        model: "fal-ai/nano-banana-pro/edit",
         generatedAt: "2026-03-22T00:00:00.000Z",
       },
     });
@@ -152,4 +192,3 @@ describe("updatePatentComponentGeneration", () => {
     expect(component?.generatedAsset?.outputFilename).toBe("tip.png");
   });
 });
-
