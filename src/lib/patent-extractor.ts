@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { hasOpenRouterApiKey } from "@/lib/openrouter";
+import { hasFalApiKey } from "@/lib/patent-image-enhancer";
 import {
   createPatentWorkspaceManifest,
   type NormalizedRegion,
@@ -875,6 +876,10 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
     extractedAt: new Date().toISOString(),
     extractedText,
     warnings,
+    capabilities: {
+      imageGeneration: hasFalApiKey(),
+      threeDGeneration: hasFalApiKey(),
+    },
     paths: diskPaths.publicPaths,
     figures,
   });

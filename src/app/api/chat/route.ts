@@ -14,25 +14,39 @@ function toOpenRouterMessages(messages: ChatMessage[]): Array<{ role: "system" |
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    console.info("[InventorNet][API][Chat] Request received");
     const body = (await request.json()) as ChatRequest;
+    console.info("[InventorNet][API][Chat] Stage passed: request body parsed", {
+      inventionId: body.inventionId,
+      componentId: body.componentId ?? null,
+      messageCount: body.messages.length,
+    });
     const invention = getInventionById(body.inventionId);
 
     if (!invention) {
+      console.warn("[InventorNet][API][Chat] Invention not found", {
+        inventionId: body.inventionId,
+      });
       return Response.json({ error: "Invention not found" }, { status: 404 });
     }
 
     const component = body.componentId ? getComponentById(body.componentId) : undefined;
+    console.info("[InventorNet][API][Chat] Stage: running expert agent");
     const result = await runExpertAgent(
       invention,
       toOpenRouterMessages(body.messages),
       component,
     );
+    console.info("[InventorNet][API][Chat] Stage passed: expert agent complete", {
+      actionCount: result.actions.length,
+    });
 
     const response: ChatResponse = {
       content: result.content,
       actions: result.actions,
     };
 
+    console.info("[InventorNet][API][Chat] Response ready");
     return Response.json(response, {
       status: 200,
       headers: {
@@ -41,6 +55,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown chat error";
+    console.error("[InventorNet][API][Chat] Request failed", error);
     return Response.json({ error: message }, { status: 500 });
   }
 }

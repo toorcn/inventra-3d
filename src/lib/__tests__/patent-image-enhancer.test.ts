@@ -8,6 +8,7 @@ import {
 describe("buildPatentComponentEnhancementPrompt", () => {
   it("includes component context and asset instructions", () => {
     const prompt = buildPatentComponentEnhancementPrompt({
+      variant: "realistic_display",
       canonicalName: "roller ball tip",
       canonicalLabel: "roller ball tip",
       canonicalRefNumber: "5",
@@ -27,6 +28,11 @@ describe("buildPatentComponentEnhancementPrompt", () => {
       assemblyChildRefNumbers: ["5", "31", "32"],
       textSnippets: ["The rolling ball is seated at the front end of the tip."],
       evidencePolicyNote: "Use direct patent evidence crops as the primary grounding.",
+      scaleHints: {
+        normalizedWidth: 0.2,
+        normalizedHeight: 0.2,
+        relativeArea: 0.04,
+      },
     });
 
     expect(prompt).toContain("Root product: ballpoint pen tip.");
@@ -36,8 +42,39 @@ describe("buildPatentComponentEnhancementPrompt", () => {
     expect(prompt).toContain("Buildable status: buildable.");
     expect(prompt).toContain("Assembly child reference numbers: 5, 31, 32.");
     expect(prompt).toContain("Visible patent reference numbers: 5, 31.");
+    expect(prompt).toContain("Patent scale hint: width 20%, height 20%, area 4%.");
     expect(prompt).toContain("How it works: Transfers ink to paper");
     expect(prompt).toContain("Render one isolated centered asset");
+  });
+
+  it("tightens framing instructions for 3D source renders", () => {
+    const prompt = buildPatentComponentEnhancementPrompt({
+      variant: "three_d_source",
+      canonicalName: "tip assembly",
+      canonicalLabel: "tip assembly",
+      canonicalRefNumber: "31",
+      kind: "subassembly",
+      componentRole: "core",
+      buildableStatus: "buildable",
+      evidenceMode: "figure_context",
+      inferenceStatus: "partial",
+      summary: "Grouped tip assembly.",
+      functionDescription: "Supports the ball and ink path.",
+      refNumbers: ["31", "32"],
+      supportingFigures: ["FIG. 1"],
+      rootProductName: "ballpoint pen tip",
+      rootProductDescription: "Finished writing tip.",
+      parentAssemblyName: "Tip body / housing",
+      relatedComponentNames: ["roller ball tip"],
+      assemblyChildRefNumbers: ["5", "31", "32"],
+      textSnippets: [],
+      evidencePolicyNote: "Use broader figure context.",
+      scaleHints: null,
+    });
+
+    expect(prompt).toContain("Create one clean 3D-source image of the assembled subassembly.");
+    expect(prompt).toContain("Show the complete object fully in frame");
+    expect(prompt).toContain("suitable for image-to-3D conversion");
   });
 });
 

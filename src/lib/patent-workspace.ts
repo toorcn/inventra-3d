@@ -115,11 +115,61 @@ export type PatentComponentReviewStatus = "pending" | "approved" | "redundant" |
 
 export type PatentComponentGenerationStatus = "idle" | "queued" | "running" | "succeeded" | "failed";
 
-export type PatentGeneratedAsset = {
+export type PatentImageVariant = "realistic_display" | "three_d_source";
+
+export type PatentGeneratedImageAsset = {
   outputPath: string;
   outputFilename: string;
   model: string;
   generatedAt: string;
+  variant: PatentImageVariant;
+};
+
+export type PatentImageVariantState = {
+  status: PatentComponentGenerationStatus;
+  error: string | null;
+  asset: PatentGeneratedImageAsset | null;
+};
+
+export type PatentMeshBounds = {
+  min: [number, number, number];
+  max: [number, number, number];
+  size: [number, number, number];
+  center: [number, number, number];
+  longestAxis: number;
+};
+
+export type PatentOrientationBasis = {
+  right: [number, number, number];
+  up: [number, number, number];
+  front: [number, number, number];
+};
+
+export type PatentThreeDAsset = {
+  outputPath: string;
+  outputFilename: string;
+  provider: "fal";
+  model: "fal-ai/trellis-2";
+  requestId: string;
+  sourceImageVariant: "three_d_source";
+  generatedAt: string;
+};
+
+export type PatentAssemblyFitStatus = "pass" | "warn" | "fail";
+
+export type PatentAssemblyContract = {
+  componentId: string;
+  role: "hero" | "subassembly";
+  parentAssemblyId: string | null;
+  nativeBounds: PatentMeshBounds;
+  normalizedBounds: PatentMeshBounds;
+  normalizedScale: number;
+  expectedLinearScale: number;
+  assembledPosition: [number, number, number];
+  explodedOffset: [number, number, number];
+  fitStatus: PatentAssemblyFitStatus;
+  fitWarnings: string[];
+  orientationBasis: PatentOrientationBasis;
 };
 
 export type PatentComponentRecord = {
@@ -140,9 +190,11 @@ export type PatentComponentRecord = {
   clusterKey: string;
   candidateIds: string[];
   evidence: PatentComponentEvidence[];
-  generationStatus: PatentComponentGenerationStatus;
-  generationError: string | null;
-  generatedAsset: PatentGeneratedAsset | null;
+  imageVariants: Record<PatentImageVariant, PatentImageVariantState>;
+  threeDStatus: PatentComponentGenerationStatus;
+  threeDError: string | null;
+  threeDAsset: PatentThreeDAsset | null;
+  assemblyContract: PatentAssemblyContract | null;
   parentAssemblyId: string | null;
   autoReviewReason?: string;
   scaleHints?: PatentScaleHints;
@@ -223,6 +275,7 @@ export type PatentWorkspacePaths = {
   textPath: string;
   candidateDirectory: string;
   generatedDirectory: string;
+  threeDDirectory: string;
 };
 
 export type PatentWorkspaceStats = {
@@ -244,6 +297,7 @@ export type PatentWorkspaceManifest = {
   extractedAt: string;
   extractedText: string;
   warnings: string[];
+  capabilities: PatentWorkspaceCapabilities;
   paths: PatentWorkspacePaths;
   stats: PatentWorkspaceStats;
   figures: PatentFigure[];
@@ -256,12 +310,31 @@ export type PatentWorkspaceManifest = {
   featured: PatentWorkspaceFeatured;
 };
 
+export type PatentWorkspaceCapabilities = {
+  imageGeneration: boolean;
+  threeDGeneration: boolean;
+};
+
 export type PatentWorkspaceFeatured = {
   rootAssemblyId: string | null;
   heroComponentId: string | null;
   subassemblyComponentIds: string[];
   subassemblyAssemblyIds: string[];
 };
+
+export function getPatentComponentImageState(
+  component: PatentComponentRecord,
+  variant: PatentImageVariant = "realistic_display",
+): PatentImageVariantState {
+  return component.imageVariants[variant];
+}
+
+export function getPatentComponentImageAsset(
+  component: PatentComponentRecord,
+  variant: PatentImageVariant = "realistic_display",
+): PatentGeneratedImageAsset | null {
+  return getPatentComponentImageState(component, variant).asset;
+}
 
 export type PatentExtractionResult = {
   outputDirectory: string;
@@ -636,7 +709,7 @@ function pickHeroComponentId(
   rootProductComponentId: string | null,
 ): string | null {
   const approvedComponents = componentLibrary.filter(
-    (component) => component.reviewStatus === "approved" && component.generationStatus !== "failed",
+    (component) => component.reviewStatus === "approved" && component.imageVariants.realistic_display.status !== "failed",
   );
   if (approvedComponents.length === 0) {
     return null;
@@ -1163,7 +1236,7 @@ function buildReviewState(componentLibrary: PatentComponentRecord[], previous?: 
       mergedComponentIds[component.id] = component.mergeTargetId;
     }
 
-    if (component.generatedAsset) {
+    if (component.imageVariants.realistic_display.asset) {
       generatedComponentIds.push(component.id);
     }
 
@@ -1344,9 +1417,22 @@ function createBaseComponentRecord(
     clusterKey: candidates[0]?.clusterKey ?? `component:${basePatentId}-component-${componentIndex}`,
     candidateIds: candidates.map((candidate) => candidate.id),
     evidence,
-    generationStatus: "idle",
-    generationError: null,
-    generatedAsset: null,
+    imageVariants: {
+      realistic_display: {
+        status: "idle",
+        error: null,
+        asset: null,
+      },
+      three_d_source: {
+        status: "idle",
+        error: null,
+        asset: null,
+      },
+    },
+    threeDStatus: "idle",
+    threeDError: null,
+    threeDAsset: null,
+    assemblyContract: null,
     parentAssemblyId: null,
     autoReviewReason: overrides.autoReviewReason,
     scaleHints,
@@ -1752,20 +1838,24 @@ export function applyPatentReviewAction(
   };
 }
 
-export function updatePatentComponentGeneration(
+export function updatePatentComponentImageGeneration(
   workspace: PatentWorkspaceManifest,
   componentId: string,
-  patch: Partial<Pick<PatentComponentRecord, "generationStatus" | "generationError" | "generatedAsset">>,
+  variant: PatentImageVariant,
+  patch: Partial<PatentImageVariantState>,
 ): PatentWorkspaceManifest {
   const updatedLibrary = workspace.componentLibrary.map((component) =>
     component.id === componentId
       ? {
           ...component,
-          generationStatus:
-            patch.generationStatus === undefined ? component.generationStatus : patch.generationStatus,
-          generationError:
-            patch.generationError === undefined ? component.generationError : patch.generationError,
-          generatedAsset: patch.generatedAsset === undefined ? component.generatedAsset : patch.generatedAsset,
+          imageVariants: {
+            ...component.imageVariants,
+            [variant]: {
+              status: patch.status === undefined ? component.imageVariants[variant].status : patch.status,
+              error: patch.error === undefined ? component.imageVariants[variant].error : patch.error,
+              asset: patch.asset === undefined ? component.imageVariants[variant].asset : patch.asset,
+            },
+          },
         }
       : component,
   );
@@ -1792,6 +1882,55 @@ export function updatePatentComponentGeneration(
     assemblies: planned.assemblies,
     reviewState,
     featured: planned.featured,
+  };
+
+  return {
+    ...nextWorkspaceWithoutStats,
+    stats: buildStats(nextWorkspaceWithoutStats),
+  };
+}
+
+export function updatePatentComponentGeneration(
+  workspace: PatentWorkspaceManifest,
+  componentId: string,
+  patch: Partial<{
+    generationStatus: PatentComponentGenerationStatus;
+    generationError: string | null;
+    generatedAsset: PatentGeneratedImageAsset | null;
+  }>,
+): PatentWorkspaceManifest {
+  return updatePatentComponentImageGeneration(workspace, componentId, "realistic_display", {
+    status: patch.generationStatus,
+    error: patch.generationError,
+    asset: patch.generatedAsset,
+  });
+}
+
+export function updatePatentComponentThreeD(
+  workspace: PatentWorkspaceManifest,
+  componentId: string,
+  patch: Partial<Pick<PatentComponentRecord, "threeDStatus" | "threeDError" | "threeDAsset" | "assemblyContract">>,
+): PatentWorkspaceManifest {
+  const updatedLibrary = workspace.componentLibrary.map((component) =>
+    component.id === componentId
+      ? {
+          ...component,
+          threeDStatus: patch.threeDStatus === undefined ? component.threeDStatus : patch.threeDStatus,
+          threeDError: patch.threeDError === undefined ? component.threeDError : patch.threeDError,
+          threeDAsset: patch.threeDAsset === undefined ? component.threeDAsset : patch.threeDAsset,
+          assemblyContract:
+            patch.assemblyContract === undefined ? component.assemblyContract : patch.assemblyContract,
+        }
+      : component,
+  );
+
+  const nextWorkspaceWithoutStats: Omit<PatentWorkspaceManifest, "stats"> = {
+    ...workspace,
+    componentLibrary: updatedLibrary,
+    reviewState: {
+      ...workspace.reviewState,
+      lastUpdatedAt: new Date().toISOString(),
+    },
   };
 
   return {

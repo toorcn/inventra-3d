@@ -15,12 +15,17 @@ function buildWorkspace(): PatentWorkspaceManifest {
     extractedAt: "2026-03-22T00:00:00.000Z",
     extractedText: "sample extracted text",
     warnings: [],
+    capabilities: {
+      imageGeneration: true,
+      threeDGeneration: true,
+    },
     paths: {
       outputDirectory: "/patents/sample-patent",
       manifestPath: "/patents/sample-patent/manifest.json",
       textPath: "/patents/sample-patent/full-text.txt",
       candidateDirectory: "/patents/sample-patent/components/candidates",
       generatedDirectory: "/patents/sample-patent/components/generated",
+      threeDDirectory: "/patents/sample-patent/components/3d",
     },
     figures: [
       {
@@ -184,11 +189,12 @@ describe("updatePatentComponentGeneration", () => {
         outputFilename: "tip.png",
         model: "fal-ai/nano-banana-pro/edit",
         generatedAt: "2026-03-22T00:00:00.000Z",
+        variant: "realistic_display",
       },
     });
 
     const component = generated.componentLibrary.find((item) => item.id === componentId);
-    expect(component?.generationStatus).toBe("succeeded");
-    expect(component?.generatedAsset?.outputFilename).toBe("tip.png");
+    expect(component?.imageVariants.realistic_display.status).toBe("succeeded");
+    expect(component?.imageVariants.realistic_display.asset?.outputFilename).toBe("tip.png");
   });
 });

@@ -226,14 +226,24 @@ export async function runExpertAgent(
 ): Promise<ExpertAgentResult> {
   const systemPrompt = buildToolInstructions(invention, component);
 
+  console.info("[InventorNet][Expert][Server] Agent started", {
+    inventionId: invention.id,
+    componentId: component?.id ?? null,
+    messageCount: messages.length,
+    mode: hasOpenRouterApiKey() ? "ai" : "offline",
+  });
+
   if (!hasOpenRouterApiKey()) {
+    console.info("[InventorNet][Expert][Server] Stage: generating offline expert response");
     const content = await chatCompletion([
       { role: "system", content: systemPrompt },
       ...messages,
     ]);
+    console.info("[InventorNet][Expert][Server] Stage passed: offline expert response complete");
     return { content, actions: [] };
   }
 
+  console.info("[InventorNet][Expert][Server] Stage: requesting structured expert response");
   const schema = {
     type: "object",
     properties: {
@@ -286,12 +296,22 @@ Do not include any tool syntax in reply.`,
     { temperature: 0.2, max_tokens: 700 },
   );
 
+  console.info("[InventorNet][Expert][Server] Stage passed: structured expert response received", {
+    toolCallCount: parsed.toolCalls.length,
+  });
   const toolCalls = parsed.toolCalls
     .map(toStructuredToolCall)
     .filter((value): value is ToolCall => value !== null);
 
+  console.info("[InventorNet][Expert][Server] Stage: translating tool calls into viewer actions", {
+    validToolCallCount: toolCalls.length,
+  });
+  const actions = executeToolCalls(invention.id, toolCalls);
+  console.info("[InventorNet][Expert][Server] Agent complete", {
+    actionCount: actions.length,
+  });
   return {
     content: parsed.reply,
-    actions: executeToolCalls(invention.id, toolCalls),
+    actions,
   };
 }

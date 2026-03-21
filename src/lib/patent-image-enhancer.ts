@@ -4,6 +4,8 @@ import type {
   PatentComponentRole,
   PatentEvidenceMode,
   PatentInferenceStatus,
+  PatentImageVariant,
+  PatentScaleHints,
 } from "@/lib/patent-workspace";
 
 export type PatentComponentReferenceImage = {
@@ -12,6 +14,7 @@ export type PatentComponentReferenceImage = {
 };
 
 export type PatentComponentEnhancementInput = {
+  variant: PatentImageVariant;
   canonicalName: string;
   canonicalLabel: string;
   canonicalRefNumber: string | null;
@@ -31,6 +34,7 @@ export type PatentComponentEnhancementInput = {
   assemblyChildRefNumbers: string[];
   textSnippets: string[];
   evidencePolicyNote: string;
+  scaleHints?: PatentScaleHints | null;
   referenceImages: PatentComponentReferenceImage[];
 };
 
@@ -71,24 +75,38 @@ export function buildPatentComponentEnhancementPrompt(
   const assemblyChildRefHint =
     input.assemblyChildRefNumbers.length > 0 ? input.assemblyChildRefNumbers.slice(0, 10).join(", ") : "none";
   const snippetHint = input.textSnippets.length > 0 ? input.textSnippets.join(" | ") : "none";
+  const isHero = input.componentRole === "root_product" || input.kind === "full_product";
   const subjectInstruction =
-    input.componentRole === "root_product" || input.kind === "full_product"
-      ? "Create a single high-fidelity, photorealistic studio render of the complete assembled product hero."
-      : input.kind === "subassembly"
-        ? "Create a single high-fidelity, photorealistic render of the assembled subassembly."
-        : "Create a single high-fidelity, photorealistic render of the finished standalone part.";
+    input.variant === "three_d_source"
+      ? isHero
+        ? "Create one clean 3D-source product image of the complete assembled product hero."
+        : input.kind === "subassembly"
+          ? "Create one clean 3D-source image of the assembled subassembly."
+          : "Create one clean 3D-source image of the standalone engineered part."
+      : isHero
+        ? "Create a single high-fidelity, photorealistic studio render of the complete assembled product hero."
+        : input.kind === "subassembly"
+          ? "Create a single high-fidelity, photorealistic render of the assembled subassembly."
+          : "Create a single high-fidelity, photorealistic render of the finished standalone part.";
   const framingInstruction =
-    input.componentRole === "root_product" || input.kind === "full_product"
-      ? "Render the full assembled object centered on a clean neutral studio background."
-      : input.kind === "subassembly"
-        ? "Render the complete subassembly centered on a clean neutral studio background."
-        : "Render one isolated centered asset on a clean neutral studio background.";
+    input.variant === "three_d_source"
+      ? "Show the complete object fully in frame, centered, isolated, and uncropped against a plain light neutral background with a minimal soft shadow."
+      : isHero
+        ? "Render the full assembled object centered on a clean neutral studio background."
+        : input.kind === "subassembly"
+          ? "Render the complete subassembly centered on a clean neutral studio background."
+          : "Render one isolated centered asset on a clean neutral studio background.";
   const inferenceInstruction =
     input.evidenceMode === "contextual_inferred" || input.inferenceStatus === "inferred"
       ? "No clean standalone figure exists for this part. Use nearby figures, ref-number context, and patent function text to reconstruct the most likely form. Missing details may be inferred conservatively from patent context. If inferred, keep geometry plausible and mechanically manufacturable. Do not invent decorative details or modern consumer styling."
       : input.evidenceMode === "figure_context"
         ? "Dedicated standalone crops are limited. Use the broader figure context to preserve correct proportions and mating surfaces."
         : "Use the direct patent evidence views as the primary grounding for geometry and silhouette.";
+
+  const scaleHint =
+    input.scaleHints && input.scaleHints.relativeArea > 0
+      ? `Patent scale hint: width ${Math.round(input.scaleHints.normalizedWidth * 100)}%, height ${Math.round(input.scaleHints.normalizedHeight * 100)}%, area ${Math.max(1, Math.round(input.scaleHints.relativeArea * 100))}%.`
+      : "Patent scale hint: none.";
 
   return [
     "Use the provided patent evidence images as reference views of the same engineered part.",
@@ -108,6 +126,7 @@ export function buildPatentComponentEnhancementPrompt(
     `Supporting figures: ${figureHint}.`,
     `Known mating relationships: ${relatedHint}.`,
     `Assembly child reference numbers: ${assemblyChildRefHint}.`,
+    scaleHint,
     `What it is: ${input.summary || "Patent component illustration."}`,
     `How it works: ${input.functionDescription || "Functional role inferred from patent context."}`,
     `Patent text context: ${snippetHint}.`,
@@ -119,6 +138,9 @@ export function buildPatentComponentEnhancementPrompt(
     framingInstruction,
     "Do not include patent callout numbers, arrows, page borders, dimension lines, labels, or any text.",
     "Do not output an exploded view, collage, blueprint, cutaway sheet, or figure plate unless explicitly requested.",
+    input.variant === "three_d_source"
+      ? "Use a consistent front-facing or near-orthographic product view suitable for image-to-3D conversion. Preserve silhouette fidelity over cinematic styling."
+      : "Use realistic materials and lighting while preserving mechanical silhouette and proportions.",
     "Return an image only.",
   ].join("\n");
 }

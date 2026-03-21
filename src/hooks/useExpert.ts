@@ -68,6 +68,12 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
 
   const sendMessage = useCallback(
     async (content: string) => {
+      console.info("[InventorNet][Expert][Client] Message queued", {
+        inventionId,
+        componentId: componentId ?? null,
+        contentPreview: content.slice(0, 120),
+      });
+
       const userMsg: ChatMessage = {
         id: uid(),
         role: "user",
@@ -79,6 +85,8 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
       setIsLoading(true);
       setIsSpeaking(true);
 
+      console.info("[InventorNet][Expert][Client] Stage: sending chat request");
+
       try {
         const response = await fetch("/api/chat", {
           method: "POST",
@@ -88,6 +96,11 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
             componentId: componentId ?? undefined,
             messages: [...messages, userMsg],
           }),
+        });
+
+        console.info("[InventorNet][Expert][Client] Stage passed: chat response received", {
+          ok: response.ok,
+          status: response.status,
         });
 
         const payload = (await response.json()) as ChatResponse | { error?: string };
@@ -106,10 +119,18 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
+        console.info("[InventorNet][Expert][Client] Stage passed: assistant message appended", {
+          actionCount: actions.length,
+        });
         if (actions.length) {
+          console.info("[InventorNet][Expert][Client] Stage: dispatching expert actions", {
+            actions,
+          });
           onActions?.(actions);
         }
-      } catch {
+        console.info("[InventorNet][Expert][Client] Chat flow complete");
+      } catch (error) {
+        console.error("[InventorNet][Expert][Client] Chat flow failed", error);
         const errorMsg: ChatMessage = {
           id: uid(),
           role: "assistant",
@@ -120,6 +141,7 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
       } finally {
         setIsLoading(false);
         setIsSpeaking(false);
+        console.info("[InventorNet][Expert][Client] Chat loading cleared");
       }
     },
     [inventionId, componentId, messages, onActions],
