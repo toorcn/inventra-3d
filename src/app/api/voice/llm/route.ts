@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { extractLatestUserMessage } from "@/lib/agora";
 import { processVoiceWebhookTurnStreaming } from "@/lib/chat-service";
-import { getVoiceSession } from "@/lib/voice-session-store";
+import { getVoiceSession, updateVoiceSessionLastAgoraText } from "@/lib/voice-session-store";
 import type { ChatMessage, VoiceAgentWebhookRequest } from "@/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function readBearerToken(request: Request): string | null {
   const authorization = request.headers.get("authorization")?.trim();
@@ -39,13 +40,17 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "Missing user content" }, { status: 400 });
     }
 
-    // Agora accumulates all user utterances into a single message each turn.
-    // Extract only the new part by diffing against the last stored user message.
-    const prevUserText = session.messages.findLast((m) => m.role === "user")?.content ?? "";
+    // Agora accumulates all user utterances into one growing string each turn.
+    // Diff against the last full Agora text (not the extracted chunk) to isolate
+    // only the newly-spoken portion.
+    const prevAgoraText = session.lastAgoraAccumulatedText ?? "";
     const userText =
-      prevUserText && fullUserText.startsWith(prevUserText)
-        ? fullUserText.slice(prevUserText.length).trim()
+      prevAgoraText && fullUserText.startsWith(prevAgoraText)
+        ? fullUserText.slice(prevAgoraText.length).trim()
         : fullUserText;
+
+    // Store the full accumulated text now so the next turn can diff against it.
+    updateVoiceSessionLastAgoraText(sessionId, fullUserText);
 
     if (!userText) {
       return Response.json({ error: "Missing user content" }, { status: 400 });

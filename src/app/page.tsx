@@ -26,7 +26,7 @@ export default function Home() {
             className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 backdrop-blur-xl transition-colors hover:bg-cyan-400/20"
           >
             <Play className="size-4" />
-            Start Demo
+            Quick Tour
           </button>
           <button
             onClick={interaction.handleReset}

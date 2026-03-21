@@ -21,6 +21,9 @@ export interface VoiceSessionRecord {
   cursor: number;
   events: VoiceSessionEvent[];
   speakingUntil: number | null;
+  // Tracks the last full accumulated transcript string sent by Agora,
+  // used to diff out only the newly-spoken portion each turn.
+  lastAgoraAccumulatedText: string | null;
 }
 
 type CreateVoiceSessionInput = {
@@ -116,6 +119,7 @@ export function createVoiceSession({ inventionId, componentId }: CreateVoiceSess
     cursor: 0,
     events: [],
     speakingUntil: null,
+    lastAgoraAccumulatedText: null,
   };
 
   sessions.set(sessionId, session);
@@ -230,6 +234,11 @@ export function getVoiceSessionEvents(sessionId: string, afterCursor = 0): { cur
     status: session.status,
     partialTranscript: session.partialTranscript,
   };
+}
+
+export function updateVoiceSessionLastAgoraText(sessionId: string, text: string): void {
+  const session = getSessionOrThrow(sessionId);
+  session.lastAgoraAccumulatedText = text;
 }
 
 export function removeVoiceSession(sessionId: string) {
