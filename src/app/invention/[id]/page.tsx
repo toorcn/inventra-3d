@@ -1,7 +1,6 @@
 "use client";
 
 import { ChatPanel } from "@/components/expert/ChatPanel";
-import { VoiceRoomControls } from "@/components/expert/VoiceRoomControls";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { ComponentInfo } from "@/components/viewer/ComponentInfo";
 import ModelViewer from "@/components/viewer/ModelViewer";
@@ -9,8 +8,8 @@ import { ViewerControls } from "@/components/viewer/ViewerControls";
 import { Badge } from "@/components/ui/Badge";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
-import { useAgoraVoice, type VoiceStatus } from "@/hooks/useAgoraVoice";
 import { useExpert } from "@/hooks/useExpert";
+import { useVoiceSession } from "@/hooks/useVoiceSession";
 import type { ExpertAction, TranscriptDelivery } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -45,10 +44,8 @@ export default function InventionDetailPage() {
   const [componentSelectionNonce, setComponentSelectionNonce] = useState(0);
   const [highlightMap, setHighlightMap] = useState<HighlightMap>({});
   const [beamEffect, setBeamEffect] = useState<BeamEffect | null>(null);
-  const [isTranscriptOpen, setIsTranscriptOpen] = useState(true);
   const timeoutsRef = useRef<number[]>([]);
   const componentSelectionNonceRef = useRef(0);
-  const lastVoiceStatusRef = useRef<VoiceStatus>("idle");
 
   const componentIdSet = useMemo(
     () => new Set(getComponentsByInventionId(invention.id).map((comp) => comp.id)),
@@ -163,14 +160,7 @@ export default function InventionDetailPage() {
     [componentIdSet, handleComponentSelect, invention.hasModel],
   );
 
-  const {
-    appendMessage,
-    messages,
-    isLoading,
-    isSpeaking,
-    sendMessage,
-    suggestedQuestions,
-  } = useExpert({
+  const { messages, isLoading, isSpeaking, sendMessage, suggestedQuestions } = useExpert({
     inventionId: invention.id,
     componentId: selectedComponentId,
     onActions: handleExpertActions,
@@ -181,73 +171,24 @@ export default function InventionDetailPage() {
     [sendMessage],
   );
 
-  const voice = useAgoraVoice({
-    inventionId: invention.id,
+  const voice = useVoiceSession({
     onSpokenTurn: handleSpokenTurn,
   });
 
-  const isVoiceRoomActive = voice.status !== "idle" && voice.status !== "error";
-  const shouldShowTranscriptRail = !isVoiceRoomActive || isTranscriptOpen;
-
-  useEffect(() => {
-    const previousStatus = lastVoiceStatusRef.current;
-
-    if (voice.status === "live" && previousStatus !== "live") {
-      appendMessage({
-        role: "system",
-        content:
-          "Live voice room started. Speak one turn at a time; typed follow-ups will share the transcript.",
-      });
-      setIsTranscriptOpen(false);
-    }
-
-    if (voice.status === "idle" && previousStatus !== "idle" && previousStatus !== "error") {
-      appendMessage({
-        role: "system",
-        content: "Live voice room ended. The transcript remains available in this session.",
-      });
-      setIsTranscriptOpen(true);
-    }
-
-    if (voice.status === "error" && previousStatus !== "error") {
-      appendMessage({
-        role: "system",
-        content: voice.error
-          ? `Voice room error: ${voice.error}`
-          : "Voice room failed to start.",
-      });
-      setIsTranscriptOpen(true);
-    }
-
-    lastVoiceStatusRef.current = voice.status;
-  }, [appendMessage, isVoiceRoomActive, voice.error, voice.status]);
+  const isVoiceBusy = voice.status === "recording" || voice.status === "transcribing" || voice.status === "speaking";
 
   const handleConversationTurn = useCallback(
     async (content: string, options?: { delivery?: TranscriptDelivery }) => {
       const response = await sendMessage(content, options);
 
-      if (isVoiceRoomActive) {
+      if (isVoiceBusy && response.content.trim()) {
         await voice.speakAssistantResponse(response.content);
       }
 
       return response;
     },
-    [isVoiceRoomActive, sendMessage, voice.speakAssistantResponse],
+    [isVoiceBusy, sendMessage, voice.speakAssistantResponse],
   );
-
-  const handleStartVoice = useCallback(() => {
-    setIsTranscriptOpen(false);
-    void voice.startVoice();
-  }, [voice.startVoice]);
-
-  const handleStopVoice = useCallback(() => {
-    setIsTranscriptOpen(true);
-    void voice.stopVoice();
-  }, [voice.stopVoice]);
-
-  const handleToggleTranscript = useCallback(() => {
-    setIsTranscriptOpen((current) => !current);
-  }, []);
 
   return (
     <main className="flex h-screen flex-col">
@@ -282,21 +223,6 @@ export default function InventionDetailPage() {
                 />
               </ErrorBoundary>
 
-              {(isVoiceRoomActive || voice.error) && (
-                <VoiceRoomControls
-                  status={voice.status}
-                  isTranscriptOpen={isTranscriptOpen}
-                  isMuted={voice.isMuted}
-                  voiceError={voice.error}
-                  onToggleTranscript={handleToggleTranscript}
-                  onToggleRecording={voice.toggleRecording}
-                  onToggleMute={() => {
-                    void voice.toggleMute();
-                  }}
-                  onStopVoice={handleStopVoice}
-                />
-              )}
-              
               {/* Overlay Info Panel for Model View */}
               <div className="pointer-events-none absolute bottom-6 left-6 z-10 max-w-sm">
                 <div className="pointer-events-auto rounded-2xl border border-white/10 bg-black/40 p-5 backdrop-blur-xl transition-all hover:bg-black/50">
@@ -369,26 +295,18 @@ export default function InventionDetailPage() {
           )}
         </div>
 
-        {shouldShowTranscriptRail && (
-          <aside className="h-[40vh] border-t border-white/5 bg-black/20 lg:h-full lg:w-[420px] lg:border-l lg:border-t-0">
-              <ChatPanel
-                messages={messages}
-                isLoading={isLoading}
-                isSpeaking={isSpeaking}
-                suggestedQuestions={suggestedQuestions}
-                voiceStatus={voice.status}
-                isVoiceMuted={voice.isMuted}
-                voiceError={voice.error}
-                onSendMessage={handleConversationTurn}
-                onStartVoice={handleStartVoice}
-                onToggleRecording={voice.toggleRecording}
-                onToggleMute={() => {
-                  void voice.toggleMute();
-                }}
-                onStopVoice={handleStopVoice}
-              />
-          </aside>
-        )}
+        <aside className="h-[40vh] border-t border-white/5 bg-black/20 lg:h-full lg:w-[420px] lg:border-l lg:border-t-0">
+          <ChatPanel
+            messages={messages}
+            isLoading={isLoading}
+            isSpeaking={isSpeaking}
+            suggestedQuestions={suggestedQuestions}
+            voiceStatus={voice.status}
+            voiceError={voice.error}
+            onSendMessage={handleConversationTurn}
+            onToggleRecording={voice.toggleRecording}
+          />
+        </aside>
       </section>
     </main>
   );

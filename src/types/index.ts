@@ -97,18 +97,6 @@ export interface VoiceSpeakRequest {
   text: string;
 }
 
-export interface AgoraVoicePrepareRequest {
-  inventionId: string;
-}
-
-export interface AgoraVoicePrepareResponse {
-  appId: string;
-  channelName: string;
-  token: string;
-  userRtcUid: number;
-  expiresAt: number;
-}
-
 export type ExpertAction =
   | {
       type: "highlight";

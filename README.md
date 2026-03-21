@@ -10,7 +10,7 @@ InventorNet is a Next.js app for exploring breakthrough inventions around the wo
 - **Open an invention detail page** with a story/brief.
 - **Explore select inventions in 3D** with component picking and an exploded view.
 - **Ask the AI Expert** questions about the invention or a selected component.
-- **Enter a live voice room** where spoken turns are transcribed with Whisper, answered by the shared expert brain, and spoken back with ElevenLabs.
+- **Speak a question** into your microphone, transcribe it with Whisper, answer it with the shared expert brain, and play the reply back with ElevenLabs.
 
 > Note: without an API key, chat/search fall back to offline heuristics and a baseline response.
 
@@ -39,11 +39,6 @@ OPENROUTER_API_KEY=...
 
 # Used for OpenRouter headers (optional).
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# Agora RTC voice room transport.
-# Copy these from the Agora RTC/App console.
-AGORA_APP_ID=...
-AGORA_APP_CERTIFICATE=...
 
 # Whisper transcription for spoken turns.
 OPENAI_API_KEY=...
