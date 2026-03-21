@@ -7,6 +7,8 @@ import { useCallback, useMemo, useState } from "react";
 export function useInventions(): UseInventionsReturn {
   const [activeCategories, setActiveCategories] = useState<CategoryId[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [focusedInventionId, setFocusedInventionId] = useState<string | null>(null);
+  const [activeInventionId, setActiveInventionId] = useState<string | null>(null);
   const [selectedInventionId, setSelectedInventionId] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
@@ -30,6 +32,18 @@ export function useInventions(): UseInventionsReturn {
     );
   }, []);
 
+  const selectCategory = useCallback((id: CategoryId | null) => {
+    setActiveCategories(id ? [id] : []);
+  }, []);
+
+  const selectFocusedInvention = useCallback((id: string | null) => {
+    setFocusedInventionId(id);
+  }, []);
+
+  const selectActiveInvention = useCallback((id: string | null) => {
+    setActiveInventionId(id);
+  }, []);
+
   const selectInvention = useCallback((id: string | null) => {
     setSelectedInventionId(id);
   }, []);
@@ -41,9 +55,21 @@ export function useInventions(): UseInventionsReturn {
   const resetFilters = useCallback(() => {
     setActiveCategories([]);
     setSearchQuery("");
+    setFocusedInventionId(null);
+    setActiveInventionId(null);
     setSelectedInventionId(null);
     setSelectedCountry(null);
   }, []);
+
+  const focusedInvention = useMemo<Invention | null>(
+    () => allInventions.find((inv) => inv.id === focusedInventionId) ?? null,
+    [focusedInventionId],
+  );
+
+  const activeInvention = useMemo<Invention | null>(
+    () => allInventions.find((inv) => inv.id === activeInventionId) ?? null,
+    [activeInventionId],
+  );
 
   const selectedInvention = useMemo<Invention | null>(
     () => allInventions.find((inv) => inv.id === selectedInventionId) ?? null,
@@ -55,8 +81,13 @@ export function useInventions(): UseInventionsReturn {
     filtered,
     activeCategories,
     toggleCategory,
+    selectCategory,
     searchQuery,
     setSearchQuery,
+    focusedInvention,
+    selectFocusedInvention,
+    activeInvention,
+    selectActiveInvention,
     selectedInvention,
     selectInvention,
     selectedCountry,

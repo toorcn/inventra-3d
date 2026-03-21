@@ -64,14 +64,14 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
         {/* Quick info grid */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 shadow-sm transition-colors hover:bg-white/[0.04]">
-            <Calendar className="size-4 text-blue-400" />
+            <Calendar className="size-4 text-white/60" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Year</p>
               <p className="text-sm font-semibold text-white">{invention.year}</p>
             </div>
           </div>
           <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 shadow-sm transition-colors hover:bg-white/[0.04]">
-            <MapPin className="size-4 text-blue-400" />
+            <MapPin className="size-4 text-white/60" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Origin</p>
               <p className="text-sm font-semibold text-white truncate">{getInventionOriginLabel(invention)}</p>
@@ -81,7 +81,7 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
 
         {/* Detailed sections */}
         <div className="space-y-8">
-          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-blue-500/50 before:to-transparent">
+          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-white/30 before:to-transparent">
             <div className="mb-2 flex items-center gap-2 text-[var(--text-secondary)]">
               <User className="size-3.5" />
               <h3 className="text-[10px] font-bold uppercase tracking-widest">Key Inventors</h3>
@@ -91,7 +91,7 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
             </p>
           </section>
 
-          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-blue-500/50 before:to-transparent">
+          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-white/30 before:to-transparent">
             <div className="mb-2 flex items-center gap-2 text-[var(--text-secondary)]">
               <FileText className="size-3.5" />
               <h3 className="text-[10px] font-bold uppercase tracking-widest">Invention Story</h3>
@@ -107,18 +107,18 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
             </div>
           </section>
 
-          <div className="mt-10 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 ring-1 ring-blue-500/10 shadow-inner">
+          <div className="mt-10 rounded-2xl border border-white/10 bg-white/[0.04] p-5 ring-1 ring-white/10 shadow-inner">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400/80">Historical Record</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/65">Historical Record</span>
               {invention.patentNumber ? (
-                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[8px] font-bold uppercase text-blue-300">Patent Confirmed</span>
+                <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase text-white/75">Patent Confirmed</span>
               ) : (
                 <span className="rounded-full bg-white/5 px-2 py-0.5 text-[8px] font-bold uppercase text-white/30">No Patent</span>
               )}
             </div>
             {invention.patentNumber ? (
               <div className="flex items-baseline gap-2">
-                <span className="text-[10px] font-mono text-blue-400/60 uppercase">No.</span>
+                <span className="text-[10px] font-mono text-white/55 uppercase">No.</span>
                 <div className="text-xl font-mono font-bold tracking-tighter text-white">
                   {invention.patentNumber}
                 </div>

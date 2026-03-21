@@ -40,30 +40,72 @@ export default function Home() {
   const handleInventionSelect = useCallback((invention: Invention) => {
     setSearchResults(null);
     setTemporosYear((currentYear) => Math.max(currentYear, invention.inventionDate));
-    focusInvention(invention, inventionState.selectInvention, globeCameraRef.current);
-  }, [inventionState.selectInvention]);
+    inventionState.selectInvention(null);
+    inventionState.selectCountry(null);
+    inventionState.selectFocusedInvention(invention.id);
+    inventionState.selectActiveInvention(invention.id);
+    focusInvention(invention, inventionState.selectFocusedInvention, globeCameraRef.current);
+  }, [
+    inventionState.selectActiveInvention,
+    inventionState.selectCountry,
+    inventionState.selectFocusedInvention,
+    inventionState.selectInvention,
+  ]);
 
   const handleSidePanelSelect = useCallback((inventionId: string | null) => {
     const focusedInvention = focusInventionById(
       inventionId,
       inventionState.inventions,
-      inventionState.selectInvention,
+      inventionState.selectFocusedInvention,
       globeCameraRef.current,
     );
+    inventionState.selectActiveInvention(null);
+    inventionState.selectInvention(null);
+    inventionState.selectCountry(null);
     if (focusedInvention) {
       setTemporosYear((currentYear) => Math.max(currentYear, focusedInvention.inventionDate));
     }
-  }, [inventionState.inventions, inventionState.selectInvention]);
+  }, [
+    inventionState.inventions,
+    inventionState.selectActiveInvention,
+    inventionState.selectCountry,
+    inventionState.selectFocusedInvention,
+    inventionState.selectInvention,
+  ]);
+
+  const handleSidePanelPreview = useCallback((inventionId: string | null) => {
+    const focusedInvention = focusInventionById(
+      inventionId,
+      inventionState.inventions,
+      inventionState.selectFocusedInvention,
+      globeCameraRef.current,
+    );
+
+    if (focusedInvention) {
+      setTemporosYear((currentYear) => Math.max(currentYear, focusedInvention.inventionDate));
+    }
+  }, [
+    inventionState.inventions,
+    inventionState.selectFocusedInvention,
+  ]);
 
   const handleCountrySelect = useCallback((countryCode: string) => {
     setSearchResults(null);
+    inventionState.selectFocusedInvention(null);
+    inventionState.selectActiveInvention(null);
     inventionState.selectInvention(null);
     inventionState.selectCountry(countryCode);
     globeCameraRef.current?.flyToCountries([countryCode]);
-  }, [inventionState.selectCountry, inventionState.selectInvention]);
+  }, [
+    inventionState.selectActiveInvention,
+    inventionState.selectCountry,
+    inventionState.selectFocusedInvention,
+    inventionState.selectInvention,
+  ]);
 
   const handleReset = useCallback(() => {
     setSearchResults(null);
+    setDemoRunning(false);
     resetDiscoveryView(
       inventionState.resetFilters,
       setTemporosYear,
@@ -71,10 +113,46 @@ export default function Home() {
     );
   }, [inventionState.resetFilters]);
 
-  const handleToggleCategory = useCallback((categoryId: Invention["category"]) => {
+  const handleStartDemo = useCallback(() => {
     setSearchResults(null);
-    inventionState.toggleCategory(categoryId);
-  }, [inventionState.toggleCategory]);
+    resetDiscoveryView(
+      inventionState.resetFilters,
+      setTemporosYear,
+      globeCameraRef.current,
+    );
+    setDemoRunning(true);
+  }, [inventionState.resetFilters]);
+
+  const handleSelectDomain = useCallback((categoryId: Invention["category"] | null) => {
+    inventionState.selectFocusedInvention(null);
+    inventionState.selectActiveInvention(null);
+    inventionState.selectInvention(null);
+    inventionState.selectCountry(null);
+    inventionState.selectCategory(categoryId);
+
+    if (!categoryId) {
+      globeCameraRef.current?.resumeAutoRotateAfterDelay(500);
+      return;
+    }
+
+    const matchingInventions = (searchResults ?? inventionState.inventions).filter(
+      (invention) => invention.category === categoryId,
+    );
+    const countryCodes = getUniqueCountryCodes(matchingInventions);
+    if (countryCodes.length > 0) {
+      globeCameraRef.current?.flyToCountries(countryCodes);
+    } else {
+      globeCameraRef.current?.resumeAutoRotateAfterDelay(500);
+    }
+  }, [
+    inventionState.inventions,
+    inventionState.selectActiveInvention,
+    inventionState.selectCategory,
+    inventionState.selectCountry,
+    inventionState.selectFocusedInvention,
+    inventionState.selectInvention,
+    searchResults,
+  ]);
 
   const handleSearchChange = useCallback((value: string) => {
     inventionState.setSearchQuery(value);
@@ -90,6 +168,8 @@ export default function Home() {
 
     if (!normalized) {
       setSearchResults(null);
+      inventionState.selectFocusedInvention(null);
+      inventionState.selectActiveInvention(null);
       inventionState.selectInvention(null);
       inventionState.selectCountry(null);
       globeCameraRef.current?.resumeAutoRotateAfterDelay(500);
@@ -127,6 +207,8 @@ export default function Home() {
       }
 
       inventionState.selectInvention(null);
+      inventionState.selectFocusedInvention(null);
+      inventionState.selectActiveInvention(null);
       inventionState.selectCountry(null);
       const countryCodes = getUniqueCountryCodes(matchedInventions);
       if (countryCodes.length > 0) {
@@ -143,25 +225,38 @@ export default function Home() {
 
   const handleCameraReady = useCallback((controller: GlobeCameraController | null) => {
     globeCameraRef.current = controller;
-  }, []);
+
+    if (!controller) return;
+
+    if (inventionState.focusedInvention) {
+      controller.flyToInvention(inventionState.focusedInvention);
+      return;
+    }
+
+    if (inventionState.selectedCountry) {
+      controller.flyToCountries([inventionState.selectedCountry]);
+    }
+  }, [inventionState.focusedInvention, inventionState.selectedCountry]);
 
   useEffect(() => {
     if (!globeCameraRef.current) return;
 
-    if (inventionState.selectedInvention) {
-      globeCameraRef.current.flyToInvention(inventionState.selectedInvention);
+    if (inventionState.focusedInvention) {
+      globeCameraRef.current.flyToInvention(inventionState.focusedInvention);
+      globeCameraRef.current.resumeAutoRotateAfterDelay();
       return;
     }
 
     if (inventionState.selectedCountry) {
       globeCameraRef.current.flyToCountries([inventionState.selectedCountry]);
+      globeCameraRef.current.resumeAutoRotateAfterDelay();
       return;
     }
 
     if (!searchResults) {
       globeCameraRef.current.resumeAutoRotateAfterDelay(600);
     }
-  }, [inventionState.selectedCountry, inventionState.selectedInvention, searchResults]);
+  }, [inventionState.focusedInvention, inventionState.selectedCountry, searchResults]);
 
   // Enter the holographic viewer with a fade transition
   const handleEnterViewer = useCallback((invention: Invention) => {
@@ -208,10 +303,50 @@ export default function Home() {
     // Future: handle component selection in viewer
   };
 
-  const visibleInventions = searchResults ?? inventionState.filtered;
+  const handleOpenDetails = useCallback((invention: Invention) => {
+    inventionState.selectFocusedInvention(invention.id);
+    inventionState.selectActiveInvention(invention.id);
+    inventionState.selectInvention(invention.id);
+  }, [
+    inventionState.selectActiveInvention,
+    inventionState.selectFocusedInvention,
+    inventionState.selectInvention,
+  ]);
+
+  const handleCloseDetails = useCallback(() => {
+    inventionState.selectInvention(null);
+  }, [inventionState.selectInvention]);
+
+  const activeDomainId = inventionState.activeCategories[0] ?? null;
+  const panelInventions = useMemo(() => {
+    if (searchResults) return searchResults;
+
+    if (inventionState.selectedCountry) {
+      return inventionState.inventions.filter(
+        (invention) => invention.countryCode === inventionState.selectedCountry,
+      );
+    }
+
+    return inventionState.inventions;
+  }, [inventionState.inventions, inventionState.selectedCountry, searchResults]);
+
+  const visibleInventions = useMemo(() => {
+    const baseInventions = searchResults ?? inventionState.filtered;
+
+    if (!activeDomainId) {
+      return baseInventions;
+    }
+
+    return baseInventions.filter((invention) => invention.category === activeDomainId);
+  }, [activeDomainId, inventionState.filtered, searchResults]);
+
   const highlightedCountryCodes = useMemo(() => {
-    if (inventionState.selectedInvention) {
-      return [inventionState.selectedInvention.countryCode];
+    const prioritizedInvention = inventionState.activeInvention
+      ?? inventionState.focusedInvention
+      ?? inventionState.selectedInvention;
+
+    if (prioritizedInvention) {
+      return [prioritizedInvention.countryCode];
     }
 
     if (inventionState.selectedCountry) {
@@ -219,20 +354,22 @@ export default function Home() {
     }
 
     if (searchResults) {
-      return getUniqueCountryCodes(searchResults);
+      return getUniqueCountryCodes(visibleInventions);
     }
 
-    if (inventionState.activeCategories.length > 0) {
-      return getUniqueCountryCodes(inventionState.filtered);
+    if (activeDomainId) {
+      return getUniqueCountryCodes(visibleInventions);
     }
 
     return [];
   }, [
-    inventionState.activeCategories.length,
-    inventionState.filtered,
+    inventionState.activeInvention,
+    inventionState.focusedInvention,
     inventionState.selectedCountry,
     inventionState.selectedInvention,
+    activeDomainId,
     searchResults,
+    visibleInventions,
   ]);
 
   return (
@@ -243,7 +380,7 @@ export default function Home() {
           <div className="absolute left-4 top-4 z-20">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setDemoRunning(true)}
+                onClick={handleStartDemo}
                 className="inline-flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-600/10 px-3 py-2 text-sm text-blue-200 backdrop-blur-xl transition-colors hover:bg-blue-500/20"
               >
                 <Play className="size-4" />
@@ -257,36 +394,46 @@ export default function Home() {
                 Reset View
               </button>
             </div>
+            <p className="mt-2 max-w-sm text-xs text-white/55">
+              Starting demo resets filters and camera to the guided baseline.
+            </p>
           </div>
 
           <DemoMode running={demoRunning} onStop={() => setDemoRunning(false)} />
 
-          <div className="absolute inset-0 pr-[26rem]">
+          <div className="absolute inset-0">
             <CesiumGlobe
               onInventionSelect={handleInventionSelect}
               onCountrySelect={handleCountrySelect}
               onCameraReady={handleCameraReady}
-              selectedInventionId={inventionState.selectedInvention?.id}
+              focusedInventionId={inventionState.focusedInvention?.id}
+              activeInventionId={inventionState.activeInvention?.id}
               highlightedCountryCodes={highlightedCountryCodes}
               temporosYear={temporosYear}
+              onEnterViewer={handleEnterViewer}
+              onOpenDetails={handleOpenDetails}
             />
-            {/* Overlay for Slider — centered in the padded area */}
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end pb-12 pr-[26rem]">
-              <TemporosSlider
-                year={temporosYear}
-                onYearChange={setTemporosYear}
-                className="pointer-events-auto shadow-2xl shadow-black/50 mb-0"
-              />
-            </div>
+          </div>
+          {/* Overlay for Slider — centered in the area left of the side panel */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end pb-12 pr-[26rem]">
+            <TemporosSlider
+              year={temporosYear}
+              onYearChange={setTemporosYear}
+              className="pointer-events-auto shadow-2xl shadow-black/50 mb-0"
+            />
           </div>
 
           <div className="pointer-events-none absolute right-4 top-4 z-20 h-[calc(100vh-2rem)]">
             <SidePanel
               inventions={visibleInventions}
+              panelInventions={panelInventions}
               activeCategories={inventionState.activeCategories}
-              onToggleCategory={handleToggleCategory}
+              onSelectDomain={handleSelectDomain}
+              focusedInvention={inventionState.focusedInvention}
               selectedInvention={inventionState.selectedInvention}
               onSelectInvention={handleSidePanelSelect}
+              onPreviewInvention={handleSidePanelPreview}
+              onCloseDetails={handleCloseDetails}
               searchValue={inventionState.searchQuery}
               onSearchChange={handleSearchChange}
               onSearchSubmit={handleSearchSubmit}

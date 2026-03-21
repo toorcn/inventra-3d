@@ -68,6 +68,7 @@ export interface InventionComponent {
 export interface Category {
   id: CategoryId;
   name: string;
+  description: string;
   color: string;
   icon: string;
 }
@@ -132,8 +133,13 @@ export interface UseInventionsReturn {
   filtered: Invention[];
   activeCategories: CategoryId[];
   toggleCategory: (id: CategoryId) => void;
+  selectCategory: (id: CategoryId | null) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  focusedInvention: Invention | null;
+  selectFocusedInvention: (id: string | null) => void;
+  activeInvention: Invention | null;
+  selectActiveInvention: (id: string | null) => void;
   selectedInvention: Invention | null;
   selectInvention: (id: string | null) => void;
   selectedCountry: string | null;

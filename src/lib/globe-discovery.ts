@@ -6,21 +6,21 @@ type SetTemporosYear = (year: number) => void;
 
 export function focusInvention(
   invention: Invention,
-  selectInvention: SelectInvention,
+  focusInventionId: SelectInvention,
   camera: GlobeCameraController | null,
 ) {
-  selectInvention(invention.id);
+  focusInventionId(invention.id);
   camera?.flyToInvention(invention);
 }
 
 export function focusInventionById(
   inventionId: string | null,
   inventions: Invention[],
-  selectInvention: SelectInvention,
+  focusInventionId: SelectInvention,
   camera: GlobeCameraController | null,
 ) {
   if (!inventionId) {
-    selectInvention(null);
+    focusInventionId(null);
     camera?.resumeAutoRotateAfterDelay();
     return null;
   }
@@ -28,7 +28,7 @@ export function focusInventionById(
   const invention = inventions.find((candidate) => candidate.id === inventionId) ?? null;
   if (!invention) return null;
 
-  focusInvention(invention, selectInvention, camera);
+  focusInvention(invention, focusInventionId, camera);
   return invention;
 }
 

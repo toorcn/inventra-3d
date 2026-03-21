@@ -7,9 +7,12 @@ interface CesiumGlobeProps {
   onInventionSelect: (invention: Invention) => void;
   onCountrySelect: (countryCode: string) => void;
   onCameraReady?: (controller: GlobeCameraController | null) => void;
-  selectedInventionId?: string;
+  focusedInventionId?: string;
+  activeInventionId?: string;
   highlightedCountryCodes?: string[];
   temporosYear: number;
+  onEnterViewer?: (invention: Invention) => void;
+  onOpenDetails?: (invention: Invention) => void;
 }
 
 const CesiumGlobe = dynamic<CesiumGlobeProps>(

@@ -27,6 +27,8 @@ interface MeshUserData {
 const LERP_FACTOR = 0.08;
 const SCALE_MIN = 0.3;
 const SCALE_MAX = 3.0;
+const IDLE_SPIN_SPEED = 0.0012;
+const IDLE_RESUME_DELAY_MS = 1200;
 
 export default function HolographicViewerClient({
   invention,
@@ -83,6 +85,7 @@ export default function HolographicViewerClient({
   const meshesRef = useRef<THREE.Mesh[]>([]);
   const animFrameRef = useRef<number>(0);
   const isExplodedRef = useRef(false);
+  const lastInteractionTimeRef = useRef<number>(0);
 
   // Expose Three.js objects as state for ComponentLabels
   const [threeScene, setThreeScene] = useState<THREE.Scene | null>(null);
@@ -93,6 +96,7 @@ export default function HolographicViewerClient({
 
   // Explode / assemble helpers
   const triggerExplode = useCallback(() => {
+    lastInteractionTimeRef.current = performance.now();
     isExplodedRef.current = true;
     setIsExploded(true);
     meshesRef.current.forEach((mesh) => {
@@ -108,6 +112,7 @@ export default function HolographicViewerClient({
   }, []);
 
   const triggerAssemble = useCallback(() => {
+    lastInteractionTimeRef.current = performance.now();
     isExplodedRef.current = false;
     setIsExploded(false);
     meshesRef.current.forEach((mesh) => {
@@ -251,6 +256,7 @@ export default function HolographicViewerClient({
     window.addEventListener("resize", handleResize);
 
     // ── Animation Loop ────────────────────────────────────────────────────────
+    lastInteractionTimeRef.current = performance.now();
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
 
@@ -259,6 +265,14 @@ export default function HolographicViewerClient({
         const ud = mesh.userData as MeshUserData;
         mesh.position.lerp(ud.targetPos, LERP_FACTOR);
       });
+
+      const modelGroup = modelGroupRef.current;
+      if (
+        modelGroup &&
+        performance.now() - lastInteractionTimeRef.current >= IDLE_RESUME_DELAY_MS
+      ) {
+        modelGroup.rotation.y += IDLE_SPIN_SPEED;
+      }
 
       renderer.render(scene, camera);
     }
@@ -283,6 +297,8 @@ export default function HolographicViewerClient({
     function handleKey(e: KeyboardEvent) {
       const group = modelGroupRef.current;
       if (!group) return;
+
+      lastInteractionTimeRef.current = performance.now();
 
       switch (e.key) {
         case "e":
@@ -336,6 +352,10 @@ export default function HolographicViewerClient({
     if (!model) return;
 
     const { gesture, wristDeltaX, pinchDistance } = gestureState;
+
+    if (gesture !== "none" || wristDeltaX !== 0 || pinchDistance !== 0) {
+      lastInteractionTimeRef.current = performance.now();
+    }
 
     // Explode / assemble on gesture
     if (gesture === "palm_open") {

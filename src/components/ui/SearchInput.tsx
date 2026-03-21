@@ -39,7 +39,7 @@ export function SearchInput({
 
   return (
     <div
-      className={`flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-[var(--text-primary)] transition-all focus-within:border-blue-400/60 focus-within:shadow-[var(--glow-blue)] ${className}`}
+      className={`flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-[var(--text-primary)] transition-all focus-within:border-white/20 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] ${className}`}
     >
       {isLoading ? <Spinner size="sm" /> : <Search className="size-4 text-[var(--text-secondary)]" />}
       <input

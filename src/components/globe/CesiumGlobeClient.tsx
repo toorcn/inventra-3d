@@ -8,15 +8,19 @@ import { getCountryByCode } from "@/data/countries";
 import { inventions } from "@/data/inventions";
 import { categoryColorMap } from "@/data/categories";
 import { getInventionOriginLabel } from "@/lib/invention-origin";
+import { InventionFocusOverlay } from "./InventionFocusOverlay";
 import type { GlobeCameraController } from "./camera-controller";
 
 interface CesiumGlobeClientProps {
   onInventionSelect: (invention: Invention) => void;
   onCountrySelect: (countryCode: string) => void;
   onCameraReady?: (controller: GlobeCameraController | null) => void;
-  selectedInventionId?: string;
+  focusedInventionId?: string;
+  activeInventionId?: string;
   highlightedCountryCodes?: string[];
   temporosYear: number;
+  onEnterViewer?: (invention: Invention) => void;
+  onOpenDetails?: (invention: Invention) => void;
 }
 
 const DEFAULT_VIEW = {
@@ -31,7 +35,7 @@ const COUNTRY_FOCUS_HEIGHT = 3500000;
 const REGION_FOCUS_HEIGHT = 6500000;
 const AUTO_ROTATE_RESUME_DELAY_MS = 3000;
 const INITIAL_AUTO_ROTATE_DELAY_MS = 500;
-const AUTO_ROTATE_RADIANS_PER_SECOND = 0.015;
+const AUTO_ROTATE_RADIANS_PER_SECOND = 0.03;
 
 interface GlobeViewTarget {
   lng: number;
@@ -57,10 +61,35 @@ interface HoveredCountryState {
   y: number;
 }
 
+interface OverlayScreenPosition {
+  left: number;
+  top: number;
+}
+
+const PREVIEW_OVERLAY_SIZE = { width: 240, height: 240 };
+const CONTEXT_OVERLAY_SIZE = { width: 240, height: 360 };
+
 function normalizeLongitude(lng: number): number {
   if (lng > 180) return ((lng + 180) % 360) - 180;
   if (lng < -180) return ((lng - 180) % 360) + 180;
   return lng;
+}
+
+function clampOverlayPosition(
+  x: number,
+  y: number,
+  containerWidth: number,
+  containerHeight: number,
+  overlayWidth: number,
+  overlayHeight: number,
+): OverlayScreenPosition {
+  const horizontalPadding = overlayWidth / 2 + 16;
+  const verticalPadding = overlayHeight + 24;
+
+  return {
+    left: Math.min(Math.max(x, horizontalPadding), containerWidth - horizontalPadding),
+    top: Math.min(Math.max(y - 22, verticalPadding), containerHeight - 16),
+  };
 }
 
 function getEntityStringProperty(
@@ -80,12 +109,23 @@ function getEntityStringProperty(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCountryCodeFromEntity(entity: any): string | null {
-  return getEntityStringProperty(entity, ["countryCode", "ISO_A2", "ISO_A2_EH"]);
+  return getEntityStringProperty(entity, [
+    "countryCode",
+    "ISO_A2",
+    "ISO_A2_EH",
+    "ISO3166-1-Alpha-2",
+  ]);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCountryNameFromEntity(entity: any): string | null {
-  return getEntityStringProperty(entity, ["countryName", "ADMIN", "NAME", "NAME_LONG"]);
+  return getEntityStringProperty(entity, [
+    "countryName",
+    "ADMIN",
+    "NAME",
+    "NAME_LONG",
+    "name",
+  ]);
 }
 
 function normalizeCountryBoundaryGeoJson(
@@ -100,6 +140,8 @@ function normalizeCountryBoundaryGeoJson(
           ? feature.properties.ISO_A2
           : typeof feature.properties?.ISO_A2_EH === "string"
             ? feature.properties.ISO_A2_EH
+            : typeof feature.properties?.["ISO3166-1-Alpha-2"] === "string"
+              ? feature.properties["ISO3166-1-Alpha-2"]
             : null;
 
         return Boolean(code && representedCountryCodes.has(code) && code !== "-99");
@@ -108,8 +150,15 @@ function normalizeCountryBoundaryGeoJson(
         ...feature,
         properties: {
           ...feature.properties,
-          countryCode: feature.properties?.countryCode ?? feature.properties?.ISO_A2 ?? feature.properties?.ISO_A2_EH,
-          countryName: feature.properties?.countryName ?? feature.properties?.ADMIN ?? feature.properties?.NAME ?? feature.properties?.NAME_LONG,
+          countryCode: feature.properties?.countryCode
+            ?? feature.properties?.ISO_A2
+            ?? feature.properties?.ISO_A2_EH
+            ?? feature.properties?.["ISO3166-1-Alpha-2"],
+          countryName: feature.properties?.countryName
+            ?? feature.properties?.ADMIN
+            ?? feature.properties?.NAME
+            ?? feature.properties?.NAME_LONG
+            ?? feature.properties?.name,
         },
       })),
   };
@@ -127,11 +176,11 @@ function createBoundaryFillMaterial(
       const isHighlighted = highlightedCountryCodesRef.current.includes(countryCode);
 
       if (isHovered) {
-        return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.28);
+        return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.35);
       }
 
       if (isHighlighted) {
-        return Cesium.Color.fromCssColorString("#2563eb").withAlpha(0.16);
+        return Cesium.Color.fromCssColorString("#3b82f6").withAlpha(0.22);
       }
 
       return Cesium.Color.fromCssColorString("#1d4ed8").withAlpha(0.02);
@@ -151,11 +200,11 @@ function createBoundaryStrokeMaterial(
       const isHighlighted = highlightedCountryCodesRef.current.includes(countryCode);
 
       if (isHovered) {
-        return Cesium.Color.fromCssColorString("#93c5fd").withAlpha(0.95);
+        return Cesium.Color.fromCssColorString("#93c5fd").withAlpha(1.0);
       }
 
       if (isHighlighted) {
-        return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.78);
+        return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.88);
       }
 
       return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.38);
@@ -192,7 +241,13 @@ function styleBoundaryEntities(
         () => strokeMaterial.color?.getValue?.() ?? Cesium.Color.WHITE,
         false,
       );
-      entity.polygon.outlineWidth = 1.6;
+      entity.polygon.outlineWidth = new Cesium.CallbackProperty(() => {
+        const isHovered = hoveredCountryCodeRef.current === countryCode;
+        const isHighlighted = highlightedCountryCodesRef.current.includes(countryCode);
+        if (isHovered) return 2.5;
+        if (isHighlighted) return 2.0;
+        return 1.2;
+      }, false);
       entity.polygon.height = 0;
     }
 
@@ -208,12 +263,16 @@ export default function CesiumGlobeClient({
   onInventionSelect,
   onCountrySelect,
   onCameraReady,
-  selectedInventionId,
+  focusedInventionId,
+  activeInventionId,
   highlightedCountryCodes = [],
   temporosYear,
+  onEnterViewer,
+  onOpenDetails,
 }: CesiumGlobeClientProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const selectedInventionIdRef = useRef<string | undefined>(selectedInventionId);
+  const focusedInventionIdRef = useRef<string | undefined>(focusedInventionId);
+  const activeInventionIdRef = useRef<string | undefined>(activeInventionId);
   const highlightedCountryCodesRef = useRef<string[]>(highlightedCountryCodes);
   const hoveredCountryCodeRef = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -227,6 +286,10 @@ export default function CesiumGlobeClient({
   const userInteractingRef = useRef(false);
   const currentViewRef = useRef<GlobeViewTarget>(DEFAULT_VIEW);
   const [hoveredCountry, setHoveredCountry] = useState<HoveredCountryState | null>(null);
+  const [hoveredInventionId, setHoveredInventionId] = useState<string | null>(null);
+  const [focusedOverlayPosition, setFocusedOverlayPosition] = useState<OverlayScreenPosition | null>(null);
+  const [activeOverlayPosition, setActiveOverlayPosition] = useState<OverlayScreenPosition | null>(null);
+  const [hoveredOverlayPosition, setHoveredOverlayPosition] = useState<OverlayScreenPosition | null>(null);
 
   const clearResumeTimer = useCallback(() => {
     if (!resumeTimerRef.current) return;
@@ -305,6 +368,7 @@ export default function CesiumGlobeClient({
     lat: number,
     height: number,
     durationSeconds = 2,
+    resumeAfterDelay = true,
   ) => {
     const Cesium = cesiumRef.current;
     const v = viewerRef.current;
@@ -318,10 +382,28 @@ export default function CesiumGlobeClient({
 
     currentViewRef.current = nextView;
     pauseAutoRotate();
-    setCenteredView(nextView);
-    void durationSeconds;
-    syncCurrentViewFromViewport();
-    resumeAutoRotateAfterDelay();
+    v.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(nextView.lng, nextView.lat, nextView.height),
+      orientation: {
+        heading: 0,
+        pitch: -Cesium.Math.PI_OVER_TWO,
+        roll: 0,
+      },
+      duration: durationSeconds,
+      complete: () => {
+        setCenteredView(nextView);
+        syncCurrentViewFromViewport();
+        if (resumeAfterDelay) {
+          resumeAutoRotateAfterDelay();
+        }
+      },
+      cancel: () => {
+        syncCurrentViewFromViewport();
+        if (resumeAfterDelay) {
+          resumeAutoRotateAfterDelay();
+        }
+      },
+    });
   }, [pauseAutoRotate, resumeAutoRotateAfterDelay, syncCurrentViewFromViewport]);
 
   const flyToInvention = useCallback((invention: Invention) => {
@@ -329,6 +411,8 @@ export default function CesiumGlobeClient({
       invention.location.lng,
       invention.location.lat,
       INVENTION_FOCUS_HEIGHT,
+      2,
+      true,
     );
   }, [flyToCoordinates]);
 
@@ -354,33 +438,38 @@ export default function CesiumGlobeClient({
       ? COUNTRY_FOCUS_HEIGHT
       : Math.max(REGION_FOCUS_HEIGHT, (Math.max(latSpan, lngSpan) + 12) * 160000);
 
-    flyToCoordinates(averageLng, averageLat, height, 2.2);
+    flyToCoordinates(averageLng, averageLat, height, 2.2, true);
   }, [flyToCoordinates, reset]);
 
   useEffect(() => {
-    selectedInventionIdRef.current = selectedInventionId;
-  }, [selectedInventionId]);
+    focusedInventionIdRef.current = focusedInventionId;
+  }, [focusedInventionId]);
 
   useEffect(() => {
-    if (!selectedInventionId) return;
+    activeInventionIdRef.current = activeInventionId;
+  }, [activeInventionId]);
+
+  useEffect(() => {
+    if (!focusedInventionId && !activeInventionId) {
+      setFocusedOverlayPosition(null);
+      setActiveOverlayPosition(null);
+      return;
+    }
+
+    if (!focusedInventionId) {
+      setFocusedOverlayPosition(null);
+    }
+
+    if (!activeInventionId) {
+      setActiveOverlayPosition(null);
+    }
+  }, [activeInventionId, focusedInventionId]);
+
+  useEffect(() => {
+    if (!focusedInventionId && !activeInventionId) return;
     hoveredCountryCodeRef.current = null;
     setHoveredCountry(null);
-  }, [selectedInventionId]);
-
-  useEffect(() => {
-    if (!selectedInventionId) return;
-
-    const selectedInvention = inventions.find((inv) => inv.id === selectedInventionId);
-    if (!selectedInvention) return;
-
-    pauseAutoRotate();
-    setCenteredView({
-      lng: selectedInvention.location.lng,
-      lat: selectedInvention.location.lat,
-      height: INVENTION_FOCUS_HEIGHT,
-    });
-    resumeAutoRotateAfterDelay();
-  }, [pauseAutoRotate, resumeAutoRotateAfterDelay, selectedInventionId, setCenteredView]);
+  }, [activeInventionId, focusedInventionId]);
 
   useEffect(() => {
     highlightedCountryCodesRef.current = highlightedCountryCodes;
@@ -396,6 +485,21 @@ export default function CesiumGlobeClient({
     );
   }, [hoveredCountry, temporosYear]);
 
+  const focusedInvention = useMemo(
+    () => inventions.find((inv) => inv.id === focusedInventionId) ?? null,
+    [focusedInventionId],
+  );
+
+  const activeInvention = useMemo(
+    () => inventions.find((inv) => inv.id === activeInventionId) ?? null,
+    [activeInventionId],
+  );
+
+  const hoveredInvention = useMemo(
+    () => inventions.find((inv) => inv.id === hoveredInventionId) ?? null,
+    [hoveredInventionId],
+  );
+
   useEffect(() => {
     onCameraReady?.({
       flyToInvention,
@@ -409,6 +513,85 @@ export default function CesiumGlobeClient({
       onCameraReady?.(null);
     };
   }, [flyToCountries, flyToInvention, onCameraReady, pauseAutoRotate, reset, resumeAutoRotateAfterDelay]);
+
+  useEffect(() => {
+    const Cesium = cesiumRef.current;
+    const v = viewerRef.current;
+    const container = containerRef.current;
+    if (!Cesium || !v || !container) return;
+
+    const computePosition = (
+      invention: Invention | null,
+      overlayWidth: number,
+      overlayHeight: number,
+    ): OverlayScreenPosition | null => {
+      if (!invention) return null;
+
+      const world = Cesium.Cartesian3.fromDegrees(
+        invention.location.lng,
+        invention.location.lat,
+        0,
+      );
+
+      const surfaceNormal = Cesium.Cartesian3.normalize(
+        world,
+        new Cesium.Cartesian3(),
+      );
+      const toCamera = Cesium.Cartesian3.normalize(
+        Cesium.Cartesian3.subtract(v.camera.positionWC, world, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3(),
+      );
+
+      if (Cesium.Cartesian3.dot(surfaceNormal, toCamera) <= 0) {
+        return null;
+      }
+
+      const windowPosition = Cesium.SceneTransforms.worldToWindowCoordinates(v.scene, world);
+      if (!windowPosition) return null;
+
+      return clampOverlayPosition(
+        windowPosition.x,
+        windowPosition.y,
+        container.clientWidth,
+        container.clientHeight,
+        overlayWidth,
+        overlayHeight,
+      );
+    };
+
+    const updateOverlayPositions = () => {
+      setFocusedOverlayPosition(
+        computePosition(
+          activeInvention ? null : focusedInvention,
+          PREVIEW_OVERLAY_SIZE.width,
+          PREVIEW_OVERLAY_SIZE.height,
+        ),
+      );
+      setHoveredOverlayPosition(
+        computePosition(
+          activeInvention || focusedInvention ? null : hoveredInvention,
+          PREVIEW_OVERLAY_SIZE.width,
+          PREVIEW_OVERLAY_SIZE.height,
+        ),
+      );
+      setActiveOverlayPosition(
+        computePosition(
+          activeInvention,
+          CONTEXT_OVERLAY_SIZE.width,
+          CONTEXT_OVERLAY_SIZE.height,
+        ),
+      );
+    };
+
+    updateOverlayPositions();
+    v.scene.postRender.addEventListener(updateOverlayPositions);
+
+    return () => {
+      if (!v.isDestroyed()) {
+        v.scene.postRender.removeEventListener(updateOverlayPositions);
+      }
+    };
+  }, [activeInvention, focusedInvention, hoveredInvention]);
 
   // Initialize Cesium viewer once
   useEffect(() => {
@@ -451,6 +634,8 @@ export default function CesiumGlobeClient({
       // Dark background colours
       v.scene.backgroundColor = Cesium.Color.fromCssColorString("#0a0a1a");
       v.scene.globe.baseColor = Cesium.Color.fromCssColorString("#111827");
+      v.scene.globe.enableLighting = true;
+      v.scene.globe.showGroundAtmosphere = true;
 
       try {
         const response = await fetch(COUNTRY_BOUNDARY_URL);
@@ -584,7 +769,9 @@ export default function CesiumGlobeClient({
 
           const inventionId = entity.properties?.inventionId?.getValue?.();
           entity.label.show.setValue(
-            entity === hoveredEntity || inventionId === selectedInventionIdRef.current,
+            entity === hoveredEntity
+              || inventionId === activeInventionIdRef.current
+              || inventionId === focusedInventionIdRef.current,
           );
         });
       };
@@ -601,6 +788,7 @@ export default function CesiumGlobeClient({
             const countryName = getCountryNameFromEntity(entity);
 
             if (inventionId) {
+              setHoveredInventionId(inventionId);
               hoveredCountryCodeRef.current = null;
               setHoveredCountry(null);
               syncLabelVisibility(entity);
@@ -608,6 +796,7 @@ export default function CesiumGlobeClient({
             }
 
             if (countryCode && countryName) {
+              setHoveredInventionId(null);
               hoveredCountryCodeRef.current = countryCode;
               setHoveredCountry({
                 code: countryCode,
@@ -622,6 +811,7 @@ export default function CesiumGlobeClient({
             return;
           }
 
+          setHoveredInventionId(null);
           hoveredCountryCodeRef.current = null;
           setHoveredCountry(null);
           syncLabelVisibility();
@@ -684,28 +874,28 @@ export default function CesiumGlobeClient({
       );
 
       let lastFrameTime = performance.now();
-      const animate = (timestamp: number) => {
-        lastFrameTime ||= timestamp;
-        const deltaSeconds = Math.min((timestamp - lastFrameTime) / 1000, 0.05);
-        lastFrameTime = timestamp;
-
+      const removeUpdateListener = v.scene.preUpdate.addEventListener(() => {
         if (
           autoRotateEnabledRef.current &&
           !userInteractingRef.current &&
-          viewerRef.current &&
-          !viewerRef.current.isDestroyed()
+          !v.isDestroyed()
         ) {
-          const currentView = currentViewRef.current;
-          setCenteredView({
-            ...currentView,
-            lng: currentView.lng - Cesium.Math.toDegrees(AUTO_ROTATE_RADIANS_PER_SECOND * deltaSeconds),
-          });
+          const now = performance.now();
+          const deltaSeconds = Math.min((now - lastFrameTime) / 1000, 0.06);
+          lastFrameTime = now;
+
+          if (deltaSeconds > 0) {
+            const currentView = currentViewRef.current;
+            setCenteredView({
+              ...currentView,
+              lng: currentView.lng - Cesium.Math.toDegrees(AUTO_ROTATE_RADIANS_PER_SECOND * deltaSeconds),
+            });
+          }
+        } else {
+          lastFrameTime = performance.now();
         }
+      });
 
-        animationFrameRef.current = window.requestAnimationFrame(animate);
-      };
-
-      animationFrameRef.current = window.requestAnimationFrame(animate);
       resumeAutoRotateAfterDelay(INITIAL_AUTO_ROTATE_DELAY_MS);
     }
 
@@ -718,6 +908,7 @@ export default function CesiumGlobeClient({
       clearResumeTimer();
       autoRotateEnabledRef.current = false;
       userInteractingRef.current = false;
+      setHoveredInventionId(null);
       hoveredCountryCodeRef.current = null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const v = viewer as any;
@@ -762,7 +953,9 @@ export default function CesiumGlobeClient({
       for (const inv of visible) {
         const color = categoryColorMap[inv.category] ?? "#ffffff";
         const cesiumColor = Cesium.Color.fromCssColorString(color);
-        const isSelected = inv.id === selectedInventionId;
+        const isFocused = inv.id === focusedInventionId;
+        const isActive = inv.id === activeInventionId;
+        const isEmphasized = isFocused || isActive;
 
         const position = Cesium.Cartesian3.fromDegrees(
           inv.location.lng,
@@ -775,27 +968,42 @@ export default function CesiumGlobeClient({
           position,
           billboard: {
             image: inv.imageSrc,
-            width: isSelected ? 132 : 112,
-            height: isSelected ? 96 : 80,
+            width: isActive ? 148 : isFocused ? 136 : 104,
+            height: isActive ? 108 : isFocused ? 100 : 76,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
             horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            pixelOffset: new Cesium.Cartesian2(0, -8),
-            scaleByDistance: new Cesium.NearFarScalar(1500000, 1, 22000000, 0.56),
-            translucencyByDistance: new Cesium.NearFarScalar(1500000, 1, 22000000, 0.86),
+            pixelOffset: new Cesium.Cartesian2(0, isEmphasized ? -24 : -10),
+            scaleByDistance: new Cesium.NearFarScalar(1500000, 1, 22000000, isEmphasized ? 0.74 : 0.52),
+            translucencyByDistance: new Cesium.NearFarScalar(1500000, 1, 22000000, isEmphasized ? 0.96 : 0.8),
+            color: isActive
+              ? Cesium.Color.WHITE
+              : isFocused
+                ? Cesium.Color.fromCssColorString("#dbeafe")
+                : Cesium.Color.WHITE.withAlpha(0.92),
           },
           label: {
             text: `${inv.title}\n${getInventionOriginLabel(inv)}`,
             font: "12px sans-serif",
-            fillColor: isSelected ? cesiumColor.brighten(0.3, new Cesium.Color()) : Cesium.Color.WHITE,
+            fillColor: isEmphasized ? cesiumColor.brighten(0.3, new Cesium.Color()) : Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -104),
+            pixelOffset: new Cesium.Cartesian2(0, isEmphasized ? -132 : -92),
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            show: isSelected,
+            show: isEmphasized,
+          },
+          point: {
+            color: isActive
+              ? Cesium.Color.fromCssColorString("#60a5fa")
+              : cesiumColor.withAlpha(isFocused ? 1 : 0.92),
+            outlineColor: Cesium.Color.fromCssColorString(isActive ? "#dbeafe" : "#07111d"),
+            outlineWidth: isEmphasized ? 3 : 2,
+            pixelSize: isActive ? 12 : isFocused ? 10 : 7,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
           },
           properties: {
             inventionId: inv.id,
@@ -833,7 +1041,7 @@ export default function CesiumGlobeClient({
 
     updateMarkers();
     v.scene.requestRender();
-  }, [highlightedCountryCodes, selectedInventionId, temporosYear]);
+  }, [activeInventionId, focusedInventionId, highlightedCountryCodes, temporosYear]);
 
   return (
     <div className="relative h-full w-full">
@@ -841,6 +1049,35 @@ export default function CesiumGlobeClient({
         ref={containerRef}
         style={{ width: "100%", height: "100%", minHeight: "520px" }}
       />
+
+      {focusedInvention && focusedOverlayPosition && !activeInvention ? (
+        <InventionFocusOverlay
+          invention={focusedInvention}
+          position={focusedOverlayPosition}
+          mode="preview"
+          onActivate={onInventionSelect}
+        />
+      ) : null}
+
+      {hoveredInvention && hoveredOverlayPosition && !focusedInvention && !activeInvention ? (
+        <InventionFocusOverlay
+          invention={hoveredInvention}
+          position={hoveredOverlayPosition}
+          mode="preview"
+          onActivate={onInventionSelect}
+        />
+      ) : null}
+
+      {activeInvention && activeOverlayPosition ? (
+        <InventionFocusOverlay
+          invention={activeInvention}
+          position={activeOverlayPosition}
+          mode="context"
+          onActivate={onInventionSelect}
+          onEnterViewer={onEnterViewer}
+          onOpenDetails={onOpenDetails}
+        />
+      ) : null}
 
       {hoveredCountry ? (
         <div
