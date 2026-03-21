@@ -9,9 +9,10 @@ import ReactMarkdown from "react-markdown";
 interface InventionDetailProps {
   invention: Invention;
   onBack: () => void;
+  onEnterViewer?: (invention: Invention) => void;
 }
 
-export function InventionDetail({ invention, onBack }: InventionDetailProps) {
+export function InventionDetail({ invention, onBack, onEnterViewer }: InventionDetailProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header section with back button and title */}
@@ -105,8 +106,9 @@ export function InventionDetail({ invention, onBack }: InventionDetailProps) {
 
       {/* Footer action section */}
       <div className="border-t border-white/5 bg-white/[0.04] p-4 backdrop-blur-md">
-        <Link href={`/invention/${invention.id}`}>
+        {onEnterViewer ? (
           <button
+            onClick={() => onEnterViewer(invention)}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             style={{
               background: "linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)",
@@ -116,7 +118,20 @@ export function InventionDetail({ invention, onBack }: InventionDetailProps) {
             <Box className="size-5" />
             Enter Holographic Viewer
           </button>
-        </Link>
+        ) : (
+          <Link href={`/invention/${invention.id}`}>
+            <button
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)",
+                boxShadow: "0 0 20px -5px #2563EB88",
+              }}
+            >
+              <Box className="size-5" />
+              Enter Holographic Viewer
+            </button>
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ interface SidePanelProps {
   onSearchChange: (value: string) => void;
   onSearchSubmit: (value: string) => void;
   isSearching: boolean;
+  onEnterViewer?: (invention: Invention) => void;
 }
 
 export function SidePanel({
@@ -30,6 +31,7 @@ export function SidePanel({
   onSearchChange,
   onSearchSubmit,
   isSearching,
+  onEnterViewer,
 }: SidePanelProps) {
   const [exaSearching, setExaSearching] = useState(false);
 
@@ -76,6 +78,7 @@ export function SidePanel({
         <InventionDetail
           invention={selectedInvention}
           onBack={() => onSelectInvention(null)}
+          onEnterViewer={onEnterViewer}
         />
       </aside>
     );
