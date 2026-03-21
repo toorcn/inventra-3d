@@ -42,10 +42,12 @@ export default function InventionDetailPage() {
 
   const [isExploded, setIsExploded] = useState(false);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [componentSelectionNonce, setComponentSelectionNonce] = useState(0);
   const [highlightMap, setHighlightMap] = useState<HighlightMap>({});
   const [beamEffect, setBeamEffect] = useState<BeamEffect | null>(null);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(true);
   const timeoutsRef = useRef<number[]>([]);
+  const componentSelectionNonceRef = useRef(0);
   const lastVoiceStatusRef = useRef<"idle" | "connecting" | "live" | "error">("idle");
 
   const componentIdSet = useMemo(
@@ -58,6 +60,19 @@ export default function InventionDetailPage() {
       timeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
       timeoutsRef.current = [];
     };
+  }, []);
+
+  const handleComponentSelect = useCallback((componentId: string | null) => {
+    if (!componentId) {
+      setSelectedComponentId(null);
+      return null;
+    }
+
+    const nextNonce = componentSelectionNonceRef.current + 1;
+    componentSelectionNonceRef.current = nextNonce;
+    setSelectedComponentId(componentId);
+    setComponentSelectionNonce(nextNonce);
+    return nextNonce;
   }, []);
 
   const handleExpertActions = useCallback(
@@ -91,12 +106,14 @@ export default function InventionDetailPage() {
 
         if (action.type === "select") {
           if (!componentIdSet.has(action.componentId)) return;
-          setSelectedComponentId(action.componentId);
+          const selectionNonce = handleComponentSelect(action.componentId);
           if (action.durationMs && action.durationMs > 0) {
             const timeoutId = window.setTimeout(() => {
-              setSelectedComponentId((current) =>
-                current === action.componentId ? null : current,
-              );
+              if (selectionNonce === componentSelectionNonceRef.current) {
+                setSelectedComponentId((current) =>
+                  current === action.componentId ? null : current,
+                );
+              }
             }, action.durationMs);
             timeoutsRef.current.push(timeoutId);
           }
@@ -115,7 +132,7 @@ export default function InventionDetailPage() {
 
         if (action.type === "reset") {
           setIsExploded(false);
-          setSelectedComponentId(null);
+          handleComponentSelect(null);
           setHighlightMap({});
           setBeamEffect(null);
           return;
@@ -143,7 +160,7 @@ export default function InventionDetailPage() {
         }
       });
     },
-    [componentIdSet, invention.hasModel],
+    [componentIdSet, handleComponentSelect, invention.hasModel],
   );
 
   const {
@@ -242,7 +259,7 @@ export default function InventionDetailPage() {
                   selectedComponentId={selectedComponentId}
                   highlightMap={highlightMap}
                   beamEffect={beamEffect}
-                  onComponentSelect={setSelectedComponentId}
+                  onComponentSelect={handleComponentSelect}
                 />
               </ErrorBoundary>
 
@@ -287,13 +304,14 @@ export default function InventionDetailPage() {
                 onToggleExplode={() => setIsExploded((prev) => !prev)}
                 onReset={() => {
                   setIsExploded(false);
-                  setSelectedComponentId(null);
+                  handleComponentSelect(null);
                 }}
               />
               {selectedComponentId && (
                 <ComponentInfo
+                  key={`${selectedComponentId}-${componentSelectionNonce}`}
                   componentId={selectedComponentId}
-                  onClose={() => setSelectedComponentId(null)}
+                  onClose={() => handleComponentSelect(null)}
                 />
               )}
             </>
