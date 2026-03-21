@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { hasFalApiKey } from "@/lib/patent-image-enhancer";
+import { resolveComponentPosition } from "@/lib/patent-assembly-inference";
 import type {
   PatentAssemblyContract,
   PatentComponentRecord,
@@ -9,6 +10,7 @@ import type {
   PatentOrientationBasis,
   PatentThreeDAsset,
   PatentWorkspaceManifest,
+  SpatialRelationship,
 } from "@/lib/patent-workspace";
 import { ensurePatentWorkspaceDirectories } from "@/lib/patent-workspace-store";
 
@@ -280,8 +282,14 @@ export function buildPatentAssemblyContract(input: {
   workspace: PatentWorkspaceManifest;
   nativeBounds: PatentMeshBounds;
   heroComponent: PatentComponentRecord;
+  inferenceData?: {
+    relationships: SpatialRelationship[];
+    resolvedPositions: Map<string, [number, number, number]>;
+    refToComponentId: Map<string, string>;
+    textDimensions: Map<string, { fractionOfHero: number }>;
+  };
 }): PatentAssemblyContract {
-  const { component, workspace, nativeBounds, heroComponent } = input;
+  const { component, workspace, nativeBounds, heroComponent, inferenceData } = input;
   if (!Number.isFinite(nativeBounds.longestAxis) || nativeBounds.longestAxis <= 0) {
     throw new Error("Mesh bounds are empty or invalid.");
   }
@@ -301,14 +309,36 @@ export function buildPatentAssemblyContract(input: {
 
   const normalizedScale = normalizedLongestAxis / nativeBounds.longestAxis;
   const normalizedBounds = scaleBounds(nativeBounds, normalizedScale);
-  const placement = isHero
-    ? {
-        assembledPosition: [0, 0, 0] as [number, number, number],
-        anchorScale: { width: null, height: null },
-        warnings: [] as string[],
-      }
-    : computeAnchorPlacement(component, workspace);
-  warnings.push(...placement.warnings);
+  let assembledPosition: [number, number, number] = [0, 0, 0];
+  let placementTier: 1 | 2 | 3 = 1;
+  let anchorScale: { width: number | null; height: number | null } = { width: null, height: null };
+
+  if (isHero) {
+    assembledPosition = [0, 0, 0];
+    placementTier = 1;
+  } else if (inferenceData) {
+    // Use inference engine for non-hero components
+    const posResult = resolveComponentPosition({
+      componentId: component.id,
+      anchorRegions: component.anchorRegions ?? [],
+      heroFigureIds: workspace.figures.filter(f => f.role === "full_product_view").map(f => f.id),
+      relationships: inferenceData.relationships.filter(r => r.ref === component.canonicalRefNumber),
+      resolvedPositions: inferenceData.resolvedPositions,
+      refToComponentId: inferenceData.refToComponentId,
+      parentComponentId: component.parentAssemblyId ?? null,
+      componentKind: component.kind,
+    });
+
+    assembledPosition = posResult.position;
+    placementTier = posResult.tier;
+  } else {
+    // Fallback: existing anchor-only logic
+    const placement = computeAnchorPlacement(component, workspace);
+    assembledPosition = placement.assembledPosition;
+    anchorScale = placement.anchorScale;
+    placementTier = placement.assembledPosition[0] === 0 && placement.assembledPosition[1] === 0 && placement.assembledPosition[2] === 0 && placement.warnings.length > 0 ? 3 : 1;
+    warnings.push(...placement.warnings);
+  }
 
   if (!isHero && normalizedBounds.longestAxis < 0.02) {
     warnings.push("Scaled subassembly is implausibly small relative to the hero.");
@@ -317,21 +347,21 @@ export function buildPatentAssemblyContract(input: {
     warnings.push("Scaled subassembly is implausibly large relative to the hero.");
   }
 
-  if (!isHero && placement.anchorScale.width && normalizedBounds.size[0] > 0) {
-    const widthRatio = Math.max(normalizedBounds.size[0], placement.anchorScale.width) / Math.max(0.0001, Math.min(normalizedBounds.size[0], placement.anchorScale.width));
+  if (!isHero && anchorScale.width && normalizedBounds.size[0] > 0) {
+    const widthRatio = Math.max(normalizedBounds.size[0], anchorScale.width) / Math.max(0.0001, Math.min(normalizedBounds.size[0], anchorScale.width));
     if (widthRatio > 2.5) {
       warnings.push("Projected mesh width differs significantly from patent anchor-region width.");
     }
   }
 
-  if (!isHero && placement.anchorScale.height && normalizedBounds.size[1] > 0) {
-    const heightRatio = Math.max(normalizedBounds.size[1], placement.anchorScale.height) / Math.max(0.0001, Math.min(normalizedBounds.size[1], placement.anchorScale.height));
+  if (!isHero && anchorScale.height && normalizedBounds.size[1] > 0) {
+    const heightRatio = Math.max(normalizedBounds.size[1], anchorScale.height) / Math.max(0.0001, Math.min(normalizedBounds.size[1], anchorScale.height));
     if (heightRatio > 2.5) {
       warnings.push("Projected mesh height differs significantly from patent anchor-region height.");
     }
   }
 
-  const [assembledX, assembledY, assembledZ] = placement.assembledPosition;
+  const [assembledX, assembledY, assembledZ] = assembledPosition;
   const directionLength = vectorLength(assembledX, assembledY, assembledZ);
   const explodedMagnitude = isHero ? 0 : 0.35 + normalizedBounds.longestAxis * 0.6;
   const explodedOffset: [number, number, number] =
@@ -353,11 +383,11 @@ export function buildPatentAssemblyContract(input: {
     normalizedBounds,
     normalizedScale,
     expectedLinearScale: isHero ? 1 : expectedLinearScale,
-    assembledPosition: placement.assembledPosition,
+    assembledPosition,
     explodedOffset,
     fitStatus: warnings.length === 0 ? "pass" : "warn",
     fitWarnings: warnings,
-    placementTier: 1,
+    placementTier,
     orientationBasis: DEFAULT_ORIENTATION_BASIS,
   };
 }

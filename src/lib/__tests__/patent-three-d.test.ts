@@ -161,4 +161,35 @@ describe("buildPatentAssemblyContract", () => {
     expect(subassemblyContract.expectedLinearScale).toBeCloseTo(Math.sqrt(0.0396 / 0.35), 5);
     expect(subassemblyContract.assembledPosition[0]).not.toBe(0);
   });
+
+  it("sets placementTier from inference data when provided", () => {
+    const workspace = buildWorkspace();
+    const hero = workspace.componentLibrary.find((c) => c.kind === "full_product")!;
+    const sub = workspace.componentLibrary.find((c) => c.kind === "subassembly")!;
+
+    const resolvedPositions = new Map<string, [number, number, number]>();
+    resolvedPositions.set(hero.id, [0, 0, 0]);
+
+    const contract = buildPatentAssemblyContract({
+      component: sub,
+      workspace,
+      nativeBounds: {
+        min: [-0.5, -0.5, -0.5],
+        max: [0.5, 0.5, 0.5],
+        size: [1, 1, 1],
+        center: [0, 0, 0],
+        longestAxis: 1,
+      },
+      heroComponent: hero,
+      inferenceData: {
+        relationships: [{ ref: "32", relation: "inside", targets: ["31"], axis: "z" }],
+        resolvedPositions,
+        refToComponentId: new Map([["31", hero.id], ["32", sub.id]]),
+        textDimensions: new Map(),
+      },
+    });
+
+    expect(contract.placementTier).toBeDefined();
+    expect([1, 2, 3]).toContain(contract.placementTier);
+  });
 });
