@@ -11,13 +11,13 @@ interface RefLike<T> {
   current: T | undefined;
 }
 
-const DEFAULT_VIEW: GlobeViewState = { lat: 20, lng: 0, altitude: 2.5 };
+const DEFAULT_VIEW: GlobeViewState = { lat: 20, lng: 0, altitude: 1.1 };
 
 export function useGlobeCamera(globeRef: RefLike<GlobeMethods>) {
   const [currentView, setCurrentView] = useState<GlobeViewState>(DEFAULT_VIEW);
 
   const flyTo = useCallback(
-    (lat: number, lng: number, altitude = 1.8, duration = 1600) => {
+    (lat: number, lng: number, altitude = 0.8, duration = 1600) => {
       const view = { lat, lng, altitude };
       globeRef.current?.pointOfView(view, duration);
       setCurrentView(view);

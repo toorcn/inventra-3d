@@ -35,6 +35,37 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/* Map invention IDs to image file names in /public/inventions/ */
+const INVENTION_IMAGES: Record<string, string> = {
+  "light-bulb": "/inventions/light-bulb.png",
+  "telephone": "/inventions/telephone.png",
+  "printing-press": "/inventions/printing-press.png",
+  "steam-engine": "/inventions/steam-engine.png",
+  "compass": "/inventions/compass.png",
+  "wright-flyer": "/inventions/wright-flyer.png",
+  "tesla-coil": "/inventions/tesla-coil.png",
+  "gunpowder": "/inventions/gunpowder.png",
+  "iphone": "/inventions/iphone.png",
+  "penicillin": "/inventions/penicillin.png",
+  "dna-structure": "/inventions/dna-structure.png",
+  "solar-cell": "/inventions/solar-cell.png",
+  "crispr": "/inventions/crispr.png",
+  "transistor": "/inventions/transistor.png",
+  "world-wide-web": "/inventions/world-wide-web.png",
+  "jet-engine": "/inventions/jet-engine.png",
+  "dynamite": "/inventions/dynamite.png",
+  "mrna-vaccine": "/inventions/mrna-vaccine.svg",
+  "lithium-ion-battery": "/inventions/lithium-ion-battery.svg",
+  "bullet-train": "/inventions/bullet-train.svg",
+  "carbon-fiber": "/inventions/carbon-fiber.svg",
+  "radio": "/inventions/radio.svg",
+  "integrated-circuit": "/inventions/integrated-circuit.svg",
+  "automobile": "/inventions/automobile.svg",
+  "kevlar": "/inventions/kevlar.svg",
+};
+
+import Image from "next/image";
+
 export default function InventionDetailPage() {
   const params = useParams<{ id: string }>();
   const inventionId = params.id;
@@ -44,6 +75,7 @@ export default function InventionDetailPage() {
     notFound();
   }
 
+  const imageSrc = INVENTION_IMAGES[invention.id];
   const [isExploded, setIsExploded] = useState(false);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [componentSelectionNonce, setComponentSelectionNonce] = useState(0);
@@ -217,25 +249,25 @@ export default function InventionDetailPage() {
   );
 
   return (
-    <main className="flex h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+    <main className="flex h-screen flex-col bg-[#05060b]">
+      <header className="flex items-center justify-between border-b border-white/5 bg-black/40 px-6 py-4 backdrop-blur-xl">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-white"
+          className="group inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--accent-gold-light)] opacity-70 transition-all hover:opacity-100"
         >
-          <ArrowLeft className="size-4" />
-          Back to Globe
+          <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
+          Return to Universe
         </Link>
         <div className="text-center">
-          <h1 className="text-base font-semibold text-white">
-            {invention.title} ({invention.year})
+          <h1 className="text-lg font-bold tracking-tight text-white" style={{ fontFamily: "var(--font-playfair), serif" }}>
+            {invention.title} <span className="opacity-40 font-serif italic text-sm">c. {invention.year}</span>
           </h1>
         </div>
         <Badge category={invention.category} />
       </header>
 
       <section className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,_#1a1f3c_0%,_#0a0a1a_100%)]">
+        <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,_#111428_0%,_#05060b_100%)] lg:flex-[2]">
           {invention.hasModel ? (
             <>
               <ErrorBoundary>
@@ -252,13 +284,13 @@ export default function InventionDetailPage() {
               </ErrorBoundary>
 
               {/* Overlay Info Panel for Model View */}
-              <div className="pointer-events-none absolute bottom-6 left-6 z-10 max-w-sm">
-                <div className="pointer-events-auto rounded-2xl border border-white/10 bg-black/40 p-5 backdrop-blur-xl transition-all hover:bg-black/50">
-                  <div className="mb-2 flex items-center gap-2">
+              <div className="pointer-events-none absolute bottom-8 left-8 z-10 max-w-sm">
+                <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/40 p-6 shadow-2xl backdrop-blur-2xl transition-all hover:bg-black/50 ring-1 ring-white/5">
+                  <div className="mb-3 flex items-center gap-3">
                     <Badge category={invention.category} />
-                    <span className="text-xs font-semibold text-blue-400/80 uppercase tracking-widest">{invention.year}</span>
+                    <span className="text-[10px] font-bold text-[var(--accent-gold)] uppercase tracking-[0.2em]">{invention.year} AD</span>
                   </div>
-                  <h2 className="mb-2 text-2xl font-bold tracking-tight text-white">{invention.title}</h2>
+                  <h2 className="mb-3 text-3xl font-bold tracking-tight text-white" style={{ fontFamily: "var(--font-playfair), serif" }}>{invention.title}</h2>
                   <div className="line-clamp-3 text-sm leading-relaxed text-gray-300 transition-all hover:line-clamp-none">
                     <ReactMarkdown components={{ p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p> }}>
                       {invention.description}
@@ -287,21 +319,38 @@ export default function InventionDetailPage() {
               )}
             </>
           ) : (
-            <div className="flex h-full items-center justify-center p-8">
-              <div className="max-w-2xl rounded-[2rem] border border-white/10 bg-[var(--bg-panel)] p-10 shadow-2xl backdrop-blur-2xl ring-1 ring-white/5">
-                <div className="mb-8 flex flex-col items-center text-center">
-                  <Badge category={invention.category} className="mb-4" />
-                  <h2 className="mb-3 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+            <div className="flex h-full items-center justify-center p-8 overflow-y-auto scrollbar-hide">
+              <div className="max-w-3xl rounded-[2.5rem] border border-[var(--border-gold)]/20 bg-[#0a0b14]/90 p-12 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5 animate-in fade-in zoom-in-95 duration-700">
+                {/* Visual Archive in Detail View */}
+                {imageSrc && (
+                  <div className="relative mb-10 aspect-[21/9] w-full overflow-hidden rounded-3xl border border-[var(--border-gold)]/30 bg-black/40 shadow-2xl">
+                    <Image
+                      src={imageSrc}
+                      alt={invention.title}
+                      fill
+                      className="object-cover opacity-80 brightness-75 transition-all duration-700 hover:scale-105 hover:opacity-100 hover:brightness-100"
+                      priority
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <div className="absolute bottom-5 left-6 flex items-center gap-2">
+                       <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--accent-gold)] drop-shadow-lg">Visual Archive</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-10 flex flex-col items-center text-center">
+                  <Badge category={invention.category} className="mb-5 px-4" />
+                  <h2 className="mb-4 text-5xl font-bold tracking-tight text-white sm:text-6xl" style={{ fontFamily: "var(--font-playfair), serif" }}>
                     {invention.title}
                   </h2>
-                  <div className="h-1 w-20 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                  <div className="h-[2px] w-24 bg-gradient-to-r from-transparent via-[var(--accent-gold)] to-transparent opacity-60" />
                 </div>
                 
                 <div className="prose prose-invert max-w-none">
                   <ReactMarkdown
                     components={{
                       p: ({ children }) => (
-                        <p className="text-lg leading-relaxed text-gray-200 antialiased first-letter:float-left first-letter:mr-3 first-letter:text-5xl first-letter:font-bold first-letter:text-blue-400 mb-6 last:mb-0">
+                        <p className="text-lg leading-relaxed text-gray-200 antialiased first-letter:float-left first-letter:mr-3 first-letter:text-6xl first-letter:font-bold first-letter:text-[var(--accent-gold)] first-letter:font-serif first-letter:leading-[1] mb-8 last:mb-0">
                           {children}
                         </p>
                       )
@@ -311,14 +360,14 @@ export default function InventionDetailPage() {
                   </ReactMarkdown>
                 </div>
 
-                <div className="mt-10 grid grid-cols-2 gap-4 border-t border-white/5 pt-8">
-                  <div>
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Invention Date</h4>
-                    <p className="text-xl font-semibold text-white">{invention.year}</p>
+                <div className="mt-12 grid grid-cols-2 gap-8 border-t border-white/10 pt-10">
+                  <div className="group transition-all">
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--accent-gold-light)] opacity-60 group-hover:opacity-100 transition-opacity">Invention Date</h4>
+                    <p className="text-2xl font-bold text-white tracking-widest">{invention.year} AD</p>
                   </div>
-                  <div>
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Primary Inventor</h4>
-                    <p className="text-xl font-semibold text-white">{invention.inventors[0]}</p>
+                  <div className="group transition-all">
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--accent-gold-light)] opacity-60 group-hover:opacity-100 transition-opacity">Primary Archivist</h4>
+                    <p className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-playfair), serif" }}>{invention.inventors[0]}</p>
                   </div>
                 </div>
               </div>
@@ -326,7 +375,8 @@ export default function InventionDetailPage() {
           )}
         </div>
 
-        <aside className="h-[40vh] border-t border-white/5 bg-black/20 lg:h-full lg:w-[420px] lg:border-l lg:border-t-0">
+        <aside className="h-[40vh] border-t border-white/5 bg-black/40 shadow-2xl backdrop-blur-md lg:h-full lg:w-[420px] lg:border-l lg:border-t-0">
+
           <ChatPanel
             messages={messages}
             isLoading={isLoading}

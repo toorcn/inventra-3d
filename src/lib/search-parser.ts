@@ -9,6 +9,7 @@ const CATEGORY_KEYWORDS: Record<CategoryId, string[]> = {
   materials: ["materials", "material", "kevlar", "carbon", "polymer", "alloy"],
   computing: ["computing", "computer", "software", "chip", "internet", "ai"],
   transportation: ["transportation", "transport", "vehicle", "train", "aviation", "flight"],
+  other: ["other", "miscellaneous", "misc"],
 };
 
 const REGIONS = ["Europe", "Asia", "North America", "South America", "Africa", "Oceania"];
@@ -92,7 +93,7 @@ export async function parseSearchQuery(query: string): Promise<SearchFilters> {
           type: "array",
           items: {
             type: "string",
-            enum: ["technology", "biology", "energy", "materials", "computing", "transportation"],
+            enum: ["technology", "biology", "energy", "materials", "computing", "transportation", "other"],
           },
         },
         region: { type: "string" },
