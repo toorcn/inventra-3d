@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, FileImage, Upload } from "lucide-react";
+import { ArrowLeft, FileImage, Sparkles, Upload } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -43,12 +43,25 @@ type ExtractResponse = {
   figures: ExtractedFigure[];
 };
 
+type EnhancementResponse = {
+  outputPath: string;
+  outputFilename: string;
+  model: string;
+};
+
+type FigureEnhancementState = {
+  isSubmitting: boolean;
+  error: string | null;
+  result: EnhancementResponse | null;
+};
+
 export default function PatentExtractPage() {
   const [file, setFile] = useState<File | null>(null);
   const [patentIdInput, setPatentIdInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractResponse | null>(null);
+  const [enhancements, setEnhancements] = useState<Record<string, FigureEnhancementState>>({});
 
   const sortedFigures = useMemo(() => {
     if (!result) {
@@ -86,11 +99,69 @@ export default function PatentExtractPage() {
       }
 
       setResult(payload as ExtractResponse);
+      setEnhancements({});
     } catch (submitError) {
       setResult(null);
+      setEnhancements({});
       setError(submitError instanceof Error ? submitError.message : "Unknown extraction error");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleEnhanceFigure(figure: ExtractedFigure) {
+    if (!result) {
+      return;
+    }
+
+    setEnhancements((current) => ({
+      ...current,
+      [figure.id]: {
+        isSubmitting: true,
+        error: null,
+        result: current[figure.id]?.result ?? null,
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/patent/enhance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patentId: result.patentId,
+          figureFilename: figure.filename,
+          figureLabel: figure.label,
+          description: figure.description,
+          components: figure.components,
+        }),
+      });
+
+      const payload = (await response.json()) as EnhancementResponse | { error?: string };
+      if (!response.ok) {
+        const errorMessage =
+          "error" in payload && payload.error ? payload.error : "Patent figure enhancement failed.";
+        throw new Error(errorMessage);
+      }
+
+      setEnhancements((current) => ({
+        ...current,
+        [figure.id]: {
+          isSubmitting: false,
+          error: null,
+          result: payload as EnhancementResponse,
+        },
+      }));
+    } catch (enhanceError) {
+      setEnhancements((current) => ({
+        ...current,
+        [figure.id]: {
+          isSubmitting: false,
+          error: enhanceError instanceof Error ? enhanceError.message : "Unknown enhancement error",
+          result: current[figure.id]?.result ?? null,
+        },
+      }));
     }
   }
 
@@ -187,64 +258,128 @@ export default function PatentExtractPage() {
           </Panel>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {sortedFigures.map((figure) => (
-              <Panel key={figure.id} className="overflow-hidden">
-                <a href={`${result.outputDirectory}/${figure.filename}`} target="_blank" rel="noreferrer" className="block">
-                  <img
-                    src={`${result.outputDirectory}/${figure.filename}`}
-                    alt={`${figure.label} on page ${figure.pageNumber}`}
-                    className="h-56 w-full bg-black/30 object-contain"
-                  />
-                </a>
+            {sortedFigures.map((figure) => {
+              const enhancement = enhancements[figure.id];
 
-                <div className="space-y-2 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium text-white">{figure.label}</div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-                      page {figure.pageNumber}
-                    </span>
-                  </div>
+              return (
+                <Panel key={figure.id} className="overflow-hidden">
+                  <a
+                    href={`${result.outputDirectory}/${figure.filename}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block"
+                  >
+                    <img
+                      src={`${result.outputDirectory}/${figure.filename}`}
+                      alt={`${figure.label} on page ${figure.pageNumber}`}
+                      className="h-56 w-full bg-black/30 object-contain"
+                    />
+                  </a>
 
-                  <p className="text-[var(--text-secondary)]">{figure.description}</p>
+                  <div className="border-y border-white/10 bg-white/[0.03] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-white">Realistic Component Render</div>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          Turn this extracted figure into a higher-fidelity product-style image.
+                        </p>
+                      </div>
 
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">
-                      {figure.analysisSource}
-                    </span>
-                    {figure.failureReason ? <span className="text-amber-200">{figure.failureReason}</span> : null}
-                    {figure.cropRegion ? (
-                      <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
-                        cropped
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <p className="mb-1 text-xs uppercase tracking-wide text-[var(--text-secondary)]">Components</p>
-                    <ul className="space-y-1 text-sm text-white">
-                      {figure.components.length > 0 ? (
-                        figure.components.slice(0, 8).map((component) => (
-                          <li key={`${figure.id}-${component.refNumber ?? "none"}-${component.name}`}>
-                            {component.refNumber ? `${component.refNumber}: ` : ""}
-                            {component.name}
-                          </li>
-                        ))
-                      ) : (
-                        <li className="text-[var(--text-secondary)]">No component labels extracted.</li>
-                      )}
-                    </ul>
-                  </div>
-
-                  <div className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs text-[var(--text-secondary)]">
-                    <div className="mb-1 inline-flex items-center gap-1 text-[11px] uppercase tracking-wide">
-                      <FileImage className="size-3" />
-                      Image file
+                      <Button
+                        type="button"
+                        size="sm"
+                        loading={enhancement?.isSubmitting ?? false}
+                        onClick={() => handleEnhanceFigure(figure)}
+                      >
+                        <Sparkles className="size-4" />
+                        {enhancement?.result ? "Re-run" : "Enhance"}
+                      </Button>
                     </div>
-                    <div>{figure.filename}</div>
+
+                    {enhancement?.error ? (
+                      <div className="mb-3 rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
+                        {enhancement.error}
+                      </div>
+                    ) : null}
+
+                    {enhancement?.result ? (
+                      <div className="space-y-2">
+                        <a href={enhancement.result.outputPath} target="_blank" rel="noreferrer" className="block">
+                          <img
+                            src={enhancement.result.outputPath}
+                            alt={`Enhanced render for ${figure.label}`}
+                            className="h-56 w-full rounded-xl border border-white/10 bg-black/30 object-contain"
+                          />
+                        </a>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-secondary)]">
+                          <span>{enhancement.result.model}</span>
+                          <a
+                            href={enhancement.result.outputPath}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-cyan-300 hover:text-cyan-200"
+                          >
+                            Open enhanced image
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex h-36 items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 px-4 text-center text-xs text-[var(--text-secondary)]">
+                        No enhanced render yet. Click Enhance to generate a realistic component image below the
+                        patent crop.
+                      </div>
+                    )}
                   </div>
-                </div>
-              </Panel>
-            ))}
+
+                  <div className="space-y-2 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-medium text-white">{figure.label}</div>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+                        page {figure.pageNumber}
+                      </span>
+                    </div>
+
+                    <p className="text-[var(--text-secondary)]">{figure.description}</p>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">
+                        {figure.analysisSource}
+                      </span>
+                      {figure.failureReason ? <span className="text-amber-200">{figure.failureReason}</span> : null}
+                      {figure.cropRegion ? (
+                        <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                          cropped
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <p className="mb-1 text-xs uppercase tracking-wide text-[var(--text-secondary)]">Components</p>
+                      <ul className="space-y-1 text-sm text-white">
+                        {figure.components.length > 0 ? (
+                          figure.components.slice(0, 8).map((component) => (
+                            <li key={`${figure.id}-${component.refNumber ?? "none"}-${component.name}`}>
+                              {component.refNumber ? `${component.refNumber}: ` : ""}
+                              {component.name}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="text-[var(--text-secondary)]">No component labels extracted.</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs text-[var(--text-secondary)]">
+                      <div className="mb-1 inline-flex items-center gap-1 text-[11px] uppercase tracking-wide">
+                        <FileImage className="size-3" />
+                        Image file
+                      </div>
+                      <div>{figure.filename}</div>
+                    </div>
+                  </div>
+                </Panel>
+              );
+            })}
           </div>
         </>
       ) : null}

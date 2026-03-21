@@ -36,6 +36,9 @@ Create `.env.local` in the project root:
 # Enables real AI responses via OpenRouter (chat + structured search parsing).
 OPENROUTER_API_KEY=...
 
+# Enables Google Gemini image-to-image enhancement for extracted patent figures.
+GEMINI_API_KEY=...
+
 # Used for OpenRouter headers (optional).
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
@@ -58,6 +61,7 @@ npm run test:watch # vitest in watch mode
 - **UI**: Tailwind CSS
 - **AI**: OpenRouter (server route at `src/app/api/chat/route.ts`)
 - **Patent PDF extraction (POC)**: `pdfjs-dist` + `canvas` + OpenRouter vision (`src/app/api/patent/extract/route.ts`)
+- **Patent figure enhancement (POC)**: Google Gemini native image generation / Nano Banana (`src/app/api/patent/enhance/route.ts`)
 
 ## Project structure
 
@@ -101,6 +105,7 @@ The API writes extracted artifacts to `public/patents/{patentId}/`:
 - `manifest.json`
 - `full-text.txt`
 - `page-<n>-fig-<label>.png` figure images
+- `enhanced/*.png|jpg|webp` realistic figure-to-product renders generated on demand
 
 ### Example curl
 
@@ -113,6 +118,7 @@ curl -X POST http://localhost:3000/api/patent/extract \
 ### Behavior and fallback
 
 - If `OPENROUTER_API_KEY` is configured, page images are analyzed by a vision-capable model to identify figure pages and infer component names/reference numbers.
+- If `GEMINI_API_KEY` is configured, each extracted figure card can also trigger a second-stage image-to-image pass that converts the patent sketch/crop into a more realistic component render.
 - Without API key, extraction still runs with heuristics (e.g., FIG label detection), but figure classification and component naming will be lower fidelity.
 - Each extracted figure includes `analysisSource` (`vision` or `heuristic`) and `failureReason` (when falling back).
 
