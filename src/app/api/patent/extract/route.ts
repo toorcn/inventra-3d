@@ -33,17 +33,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     return Response.json(
-      {
-        patentId: result.manifest.patentId,
-        outputDirectory: result.outputDirectory,
-        manifestPath: result.manifestPath,
-        textPath: result.textPath,
-        totalPages: result.manifest.totalPages,
-        processedPages: result.manifest.processedPages,
-        figureCount: result.manifest.figures.length,
-        warnings: result.manifest.warnings,
-        figures: result.manifest.figures,
-      },
+      result.manifest,
       {
         status: 200,
         headers: {

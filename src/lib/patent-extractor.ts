@@ -1,57 +1,39 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { hasOpenRouterApiKey } from "@/lib/openrouter";
-
-type FigureComponent = {
-  refNumber: string | null;
-  name: string;
-};
-
-type NormalizedRegion = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label?: string | null;
-  confidence?: number;
-};
-
-type FigureExtraction = {
-  id: string;
-  filename: string;
-  pageNumber: number;
-  label: string;
-  description: string;
-  analysisSource: "vision" | "heuristic";
-  failureReason: string | null;
-  cropRegion: NormalizedRegion | null;
-  components: FigureComponent[];
-  pageTextSnippet: string;
-};
-
-export type PatentExtractionManifest = {
-  patentId: string;
-  sourceFilename: string;
-  totalPages: number;
-  processedPages: number;
-  extractedAt: string;
-  extractedText: string;
-  warnings: string[];
-  figures: FigureExtraction[];
-};
-
-export type PatentExtractionResult = {
-  outputDirectory: string;
-  manifestPath: string;
-  textPath: string;
-  manifest: PatentExtractionManifest;
-};
+import {
+  createPatentWorkspaceManifest,
+  type NormalizedRegion,
+  type PatentAssetKind,
+  type PatentExtractionResult,
+  type PatentFigure,
+  type PatentFigureComponent,
+  type PatentFigureComponentDetection,
+} from "@/lib/patent-workspace";
+import { ensurePatentWorkspaceDirectories, writePatentWorkspaceManifest } from "@/lib/patent-workspace-store";
 
 type PatentExtractionInput = {
   pdfBuffer: Buffer;
   sourceFilename: string;
   patentId?: string;
+};
+
+type VisionComponent = {
+  refNumber: string | null;
+  name: string;
+  summary: string;
+  functionDescription: string;
+  kind: PatentAssetKind;
+  confidence: number;
+};
+
+type VisionComponentRegion = VisionComponent & {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string | null;
 };
 
 type VisionFigureAnalysis = {
@@ -60,7 +42,8 @@ type VisionFigureAnalysis = {
   labels: string[];
   description: string;
   figureRegions: NormalizedRegion[];
-  components: FigureComponent[];
+  components: VisionComponent[];
+  componentRegions: VisionComponentRegion[];
 };
 
 type VisionAnalysisResult = {
@@ -104,7 +87,6 @@ type Canvas2DContext = ReturnType<ReturnType<typeof createCanvas>["getContext"]>
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const VISION_MODEL = "google/gemini-2.0-flash-001";
-
 const FIGURE_LABEL_REGEX = /(?:fig(?:ure)?\.?\s*)(\d+[a-z]?)/gi;
 
 let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
@@ -210,6 +192,14 @@ function createPatentId(sourceFilename: string, patentId?: string): string {
   return normalized ? `${normalized}-${stamp}` : `patent-${stamp}`;
 }
 
+function sanitizeFileToken(token: string): string {
+  return token
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+}
+
 function extractFigureLabels(text: string): string[] {
   const labels: string[] = [];
   const seen = new Set<string>();
@@ -274,28 +264,76 @@ async function analyzeFigureWithVision(imageBuffer: Buffer, pageText: string): P
           properties: {
             refNumber: { type: ["string", "null"] },
             name: { type: "string" },
+            summary: { type: "string" },
+            functionDescription: { type: "string" },
+            kind: { type: "string", enum: ["full_product", "subassembly", "component"] },
+            confidence: { type: "number" },
           },
-          required: ["refNumber", "name"],
+          required: ["refNumber", "name", "summary", "functionDescription", "kind", "confidence"],
+          additionalProperties: false,
+        },
+      },
+      componentRegions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            x: { type: "number" },
+            y: { type: "number" },
+            width: { type: "number" },
+            height: { type: "number" },
+            label: { type: ["string", "null"] },
+            refNumber: { type: ["string", "null"] },
+            name: { type: "string" },
+            summary: { type: "string" },
+            functionDescription: { type: "string" },
+            kind: { type: "string", enum: ["full_product", "subassembly", "component"] },
+            confidence: { type: "number" },
+          },
+          required: [
+            "x",
+            "y",
+            "width",
+            "height",
+            "label",
+            "refNumber",
+            "name",
+            "summary",
+            "functionDescription",
+            "kind",
+            "confidence",
+          ],
           additionalProperties: false,
         },
       },
     },
-    required: ["isFigurePage", "isTextOnlyPage", "labels", "description", "figureRegions", "components"],
+    required: [
+      "isFigurePage",
+      "isTextOnlyPage",
+      "labels",
+      "description",
+      "figureRegions",
+      "components",
+      "componentRegions",
+    ],
     additionalProperties: false,
   };
 
   const prompt = [
-    "Analyze this patent page image.",
+    "Analyze this patent page image for later component extraction and 3D assembly planning.",
     "Decide if this page is primarily a patent figure/diagram (not prose-heavy claims/spec text).",
     "Return isTextOnlyPage=true when the page is mostly text/prose and should not be exported as an image.",
-    "If it is a figure page, extract visible figure labels (e.g., FIG. 1, FIG. 2A), a short description, and component mentions.",
-    "Also return figureRegions: normalized bounding boxes [x,y,width,height] for diagram areas only (exclude text blocks).",
-    "Coordinates are 0..1 relative to full page image.",
-    "For components, include the reference number if visible (e.g., 102), otherwise refNumber should be null.",
-    "Keep names short, concrete, and noun-based.",
+    "If it is a figure page, extract visible figure labels (e.g., FIG. 1, FIG. 2A), a short figure description, and component evidence.",
+    "Return figureRegions as normalized bounding boxes [x,y,width,height] for whole diagram areas only.",
+    "Return componentRegions for distinct visible manufacturable parts or subassemblies within the figure.",
+    "Only create multiple componentRegions when the image clearly shows separate parts worth preserving independently.",
+    "For each component or componentRegion, provide a concise specific name, what it is, how it works in the patent, refNumber if visible, confidence 0..1, and kind.",
+    "Use kind='full_product' only for the full product view, 'subassembly' for multi-part groupings, and 'component' for leaf parts.",
+    "Avoid generic names like component, portion, or device unless absolutely necessary.",
+    "Coordinates are 0..1 relative to the full page image.",
     "",
     "Page OCR/Text context:",
-    pageText.slice(0, 2500),
+    pageText.slice(0, 2800),
   ].join("\n");
 
   const response = await fetch(OPENROUTER_URL, {
@@ -304,11 +342,11 @@ async function analyzeFigureWithVision(imageBuffer: Buffer, pageText: string): P
     body: JSON.stringify({
       model: VISION_MODEL,
       temperature: 0,
-      max_tokens: 800,
+      max_tokens: 1400,
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "patent_figure_analysis",
+          name: "patent_component_analysis",
           strict: true,
           schema,
         },
@@ -377,7 +415,8 @@ function fallbackHeuristic(pageText: string): VisionFigureAnalysis {
   const labels = extractFigureLabels(pageText);
   const isFigurePage = labels.length > 0;
   const words = pageText.split(/\s+/).filter(Boolean);
-  const snippet = words.slice(0, 25).join(" ");
+  const snippet = words.slice(0, 32).join(" ");
+  const fallbackName = labels[0] ? `${labels[0]} component` : "patent component";
 
   return {
     isFigurePage,
@@ -387,28 +426,25 @@ function fallbackHeuristic(pageText: string): VisionFigureAnalysis {
       ? "Patent figure page detected via FIG labels."
       : "Not identified as a figure page by fallback heuristic.",
     figureRegions: [],
-    components: snippet
+    components: isFigurePage
       ? [
           {
             refNumber: null,
-            name: snippet.slice(0, 90),
+            name: fallbackName,
+            summary: snippet || "Patent component inferred from figure context.",
+            functionDescription: "Functional role inferred from nearby patent text.",
+            kind: "subassembly",
+            confidence: 0.35,
           },
         ]
       : [],
+    componentRegions: [],
   };
 }
 
-function sanitizeFileToken(token: string): string {
-  return token
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 20);
-}
-
-function dedupeComponents(components: FigureComponent[]): FigureComponent[] {
+function dedupeFigureComponents(components: VisionComponent[]): PatentFigureComponent[] {
   const seen = new Set<string>();
-  const result: FigureComponent[] = [];
+  const result: PatentFigureComponent[] = [];
 
   for (const component of components) {
     const name = component.name.trim();
@@ -457,12 +493,32 @@ async function extractPageText(page: PdfPage): Promise<string> {
     .trim();
 }
 
+function buildFallbackRegions(
+  figureId: string,
+  figureLabel: string,
+  figureFilename: string,
+  figureImagePath: string,
+  components: VisionComponent[],
+  figureCropRegion: NormalizedRegion | null,
+): PatentFigureComponentDetection[] {
+  return components.slice(0, 8).map((component, index) => ({
+    id: `${figureId}-component-${index + 1}`,
+    name: component.name.trim() || `Component ${index + 1}`,
+    refNumber: component.refNumber?.trim() || null,
+    summary: component.summary.trim() || `Component inferred from ${figureLabel}.`,
+    functionDescription: component.functionDescription.trim() || "Functional role inferred from patent context.",
+    kind: component.kind,
+    confidence: component.confidence,
+    region: figureCropRegion,
+    imageFilename: figureFilename,
+    imagePath: figureImagePath,
+    sourceFigureId: figureId,
+  }));
+}
+
 export async function extractPatentFigures(input: PatentExtractionInput): Promise<PatentExtractionResult> {
   const patentId = createPatentId(input.sourceFilename, input.patentId);
-  const outputDirectoryRelative = path.posix.join("patents", patentId);
-  const outputDirectoryAbsolute = path.join(process.cwd(), "public", outputDirectoryRelative);
-
-  await mkdir(outputDirectoryAbsolute, { recursive: true });
+  const diskPaths = await ensurePatentWorkspaceDirectories(patentId);
 
   const pdfjsLib = await loadPdfJsModule();
   const documentTask = pdfjsLib.getDocument({
@@ -476,7 +532,7 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
   const maxPages = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 60;
   const pagesToProcess = Math.min(pdf.numPages, maxPages);
   const pagesText: string[] = [];
-  const figures: FigureExtraction[] = [];
+  const figures: PatentFigure[] = [];
   const warnings: string[] = [];
 
   if (pdf.numPages > maxPages) {
@@ -516,23 +572,89 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
       const label = analysis.labels[0] ?? extractFigureLabels(pageText)[0] ?? `FIG. P${pageNumber}`;
       const safeLabel = sanitizeFileToken(label.replace(/^fig\.?\s*/i, "fig-"));
       const filename = `page-${pageNumber}-${safeLabel || `fig-p${pageNumber}`}.png`;
-      const fileAbsolutePath = path.join(outputDirectoryAbsolute, filename);
+      const figureAbsolutePath = path.join(diskPaths.rootAbsolute, filename);
+      const figureImagePath = `${diskPaths.publicPaths.outputDirectory}/${filename}`;
 
       const cropRegion = pickBestRegion(analysis.figureRegions);
       const imageToWrite = cropRegion ? await cropImageByRegion(imageBuffer, cropRegion) : imageBuffer;
+      await writeFile(figureAbsolutePath, imageToWrite);
 
-      await writeFile(fileAbsolutePath, imageToWrite);
+      const detectionInputs =
+        analysis.componentRegions.length > 0
+          ? analysis.componentRegions.map((region) => ({
+              ...region,
+              region: normalizeRegion(region),
+            }))
+          : analysis.components.map((component) => ({
+              ...component,
+              label: null,
+              x: cropRegion?.x ?? 0,
+              y: cropRegion?.y ?? 0,
+              width: cropRegion?.width ?? 1,
+              height: cropRegion?.height ?? 1,
+              region: cropRegion,
+            }));
+
+      const componentDetections: PatentFigureComponentDetection[] = [];
+
+      for (let index = 0; index < detectionInputs.length; index += 1) {
+        const detection = detectionInputs[index];
+        const detectionRegion = detection.region;
+        const componentToken = sanitizeFileToken(
+          `${detection.refNumber ?? detection.name}-${index + 1}`,
+        ) || `component-${index + 1}`;
+
+        let imageFilename = filename;
+        let imagePath = figureImagePath;
+
+        if (detectionRegion) {
+          const detectionBuffer = await cropImageByRegion(imageBuffer, detectionRegion);
+          imageFilename = `candidate-p${pageNumber}-${safeLabel}-${componentToken}.png`;
+          const candidateAbsolutePath = path.join(diskPaths.candidateAbsoluteDirectory, imageFilename);
+          await writeFile(candidateAbsolutePath, detectionBuffer);
+          imagePath = `${diskPaths.publicPaths.candidateDirectory}/${imageFilename}`;
+        }
+
+        componentDetections.push({
+          id: `${safeLabel || `fig-p${pageNumber}`}-detection-${index + 1}`,
+          name: detection.name.trim() || `Component ${index + 1}`,
+          refNumber: detection.refNumber?.trim() || null,
+          summary: detection.summary.trim() || `Patent component from ${label}.`,
+          functionDescription:
+            detection.functionDescription.trim() || "Functional role inferred from patent figure context.",
+          kind: detection.kind,
+          confidence: typeof detection.confidence === "number" ? Math.max(0, Math.min(1, detection.confidence)) : 0.5,
+          region: detectionRegion,
+          imageFilename,
+          imagePath,
+          sourceFigureId: `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
+        });
+      }
+
+      const fallbackDetections =
+        componentDetections.length > 0
+          ? componentDetections
+          : buildFallbackRegions(
+              `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
+              label,
+              filename,
+              figureImagePath,
+              analysis.components,
+              cropRegion,
+            );
 
       figures.push({
         id: `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
         filename,
+        imagePath: figureImagePath,
         pageNumber,
         label,
         description: analysis.description.trim() || "Patent figure page",
         analysisSource,
         failureReason,
         cropRegion,
-        components: dedupeComponents(analysis.components),
+        components: dedupeFigureComponents(analysis.components),
+        componentDetections: fallbackDetections,
         pageTextSnippet: pageText.slice(0, 500),
       });
     } catch (error) {
@@ -542,14 +664,9 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
   }
 
   const extractedText = pagesText.join("\n\n").trim();
-  const textPathRelative = path.posix.join(outputDirectoryRelative, "full-text.txt");
-  const manifestPathRelative = path.posix.join(outputDirectoryRelative, "manifest.json");
-  const textPathAbsolute = path.join(process.cwd(), "public", textPathRelative);
-  const manifestPathAbsolute = path.join(process.cwd(), "public", manifestPathRelative);
+  await writeFile(diskPaths.textAbsolute, extractedText, "utf8");
 
-  await writeFile(textPathAbsolute, extractedText, "utf8");
-
-  const manifest: PatentExtractionManifest = {
+  const manifest = createPatentWorkspaceManifest({
     patentId,
     sourceFilename: input.sourceFilename,
     totalPages: pdf.numPages,
@@ -557,15 +674,18 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
     extractedAt: new Date().toISOString(),
     extractedText,
     warnings,
+    paths: diskPaths.publicPaths,
     figures,
-  };
+  });
 
-  await writeFile(manifestPathAbsolute, JSON.stringify(manifest, null, 2), "utf8");
+  await writePatentWorkspaceManifest(manifest);
 
   return {
-    outputDirectory: `/${outputDirectoryRelative}`,
-    manifestPath: `/${manifestPathRelative}`,
-    textPath: `/${textPathRelative}`,
+    outputDirectory: diskPaths.publicPaths.outputDirectory,
+    manifestPath: diskPaths.publicPaths.manifestPath,
+    textPath: diskPaths.publicPaths.textPath,
     manifest,
   };
 }
+
+export type { PatentExtractionInput };

@@ -1,17 +1,21 @@
-type FigureComponent = {
-  refNumber: string | null;
-  name: string;
-};
+import type { PatentAssetKind } from "@/lib/patent-workspace";
 
-type PatentFigureEnhancementInput = {
-  figureLabel: string;
-  description: string;
-  components: FigureComponent[];
+export type PatentComponentReferenceImage = {
   imageBuffer: Buffer;
   mimeType?: string;
 };
 
-type PatentFigureEnhancementResult = {
+export type PatentComponentEnhancementInput = {
+  canonicalName: string;
+  kind: PatentAssetKind;
+  summary: string;
+  functionDescription: string;
+  refNumbers: string[];
+  supportingFigures: string[];
+  referenceImages: PatentComponentReferenceImage[];
+};
+
+type PatentComponentEnhancementResult = {
   imageBuffer: Buffer;
   mimeType: string;
   model: string;
@@ -48,34 +52,28 @@ export function hasGeminiApiKey(): boolean {
   return Boolean(getGeminiApiKey());
 }
 
-export function buildPatentFigureEnhancementPrompt(input: Omit<PatentFigureEnhancementInput, "imageBuffer" | "mimeType">): string {
-  const componentHints = input.components
-    .slice(0, 8)
-    .map((component) => {
-      const name = component.name.trim();
-      if (!name) {
-        return null;
-      }
-      return component.refNumber ? `${component.refNumber} ${name}` : name;
-    })
-    .filter((value): value is string => Boolean(value))
-    .join(", ");
+export function buildPatentComponentEnhancementPrompt(
+  input: Omit<PatentComponentEnhancementInput, "referenceImages">,
+): string {
+  const refHint = input.refNumbers.length > 0 ? input.refNumbers.join(", ") : "none";
+  const figureHint = input.supportingFigures.length > 0 ? input.supportingFigures.slice(0, 6).join(", ") : "none";
 
   return [
-    "Use the provided patent figure as the reference image.",
-    "Create a single high-fidelity, photorealistic product-style render of the main engineered component shown in the figure.",
-    `Target figure label: ${input.figureLabel || "Unknown figure"}.`,
-    `Figure description: ${input.description || "Patent component illustration."}`,
-    componentHints ? `Visible component hints: ${componentHints}.` : null,
-    "Preserve the reference image's overall silhouette, orientation, proportions, and major mechanical sub-parts.",
-    "Convert sketch or line-art cues into realistic materials, depth, lighting, surface detail, and shadows.",
-    "Focus on one clean hero render of the primary component on a neutral studio background.",
-    "Do not include patent callout numbers, arrows, labels, measurement marks, page borders, multi-panel layouts, or any text.",
-    "Do not output a blueprint, exploded diagram, or illustration.",
+    "Use the provided patent evidence images as reference views of the same engineered part.",
+    "Create a single high-fidelity, photorealistic studio render of this component.",
+    `Component name: ${input.canonicalName || "Unknown component"}.`,
+    `Component type: ${input.kind}.`,
+    `Visible patent reference numbers: ${refHint}.`,
+    `Supporting figures: ${figureHint}.`,
+    `What it is: ${input.summary || "Patent component illustration."}`,
+    `How it works: ${input.functionDescription || "Functional role inferred from patent context."}`,
+    "Preserve the silhouette, proportions, and key mechanical features visible in the evidence.",
+    "If multiple evidence images are provided, reconcile them into one consistent component design.",
+    "Render one isolated centered asset on a clean neutral studio background.",
+    "Do not include patent callout numbers, arrows, page borders, dimension lines, labels, or any text.",
+    "Do not output an exploded view, collage, blueprint, or cutaway sheet.",
     "Return an image only.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].join("\n");
 }
 
 function extractInlineImagePart(payload: GeminiGenerateContentResponse): GeminiInlineData | null {
@@ -105,15 +103,31 @@ export function getImageExtensionForMimeType(mimeType: string): string {
   }
 }
 
-export async function enhancePatentFigureImage(
-  input: PatentFigureEnhancementInput,
-): Promise<PatentFigureEnhancementResult> {
+export function isRateLimitErrorMessage(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("429") || normalized.includes("quota") || normalized.includes("rate limit");
+}
+
+export async function enhancePatentComponentImage(
+  input: PatentComponentEnhancementInput,
+): Promise<PatentComponentEnhancementResult> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is missing. Add it to enable Nano Banana figure enhancement.");
+    throw new Error("GEMINI_API_KEY is missing. Add it to enable Nano Banana component enhancement.");
   }
 
-  const prompt = buildPatentFigureEnhancementPrompt(input);
+  if (input.referenceImages.length === 0) {
+    throw new Error("At least one reference image is required for component enhancement.");
+  }
+
+  const prompt = buildPatentComponentEnhancementPrompt(input);
+  const parts = input.referenceImages.slice(0, 3).map((referenceImage) => ({
+    inline_data: {
+      mime_type: referenceImage.mimeType ?? "image/png",
+      data: referenceImage.imageBuffer.toString("base64"),
+    },
+  }));
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`,
     {
@@ -126,12 +140,7 @@ export async function enhancePatentFigureImage(
         contents: [
           {
             parts: [
-              {
-                inline_data: {
-                  mime_type: input.mimeType ?? "image/png",
-                  data: input.imageBuffer.toString("base64"),
-                },
-              },
+              ...parts,
               {
                 text: prompt,
               },
