@@ -45,6 +45,13 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown voice invite error";
+    console.error("[voice][agent/invite] failed", {
+      message,
+      cause:
+        error instanceof Error && "cause" in error
+          ? error.cause
+          : undefined,
+    });
     return Response.json({ error: message }, { status: 500 });
   }
 }

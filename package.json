@@ -15,6 +15,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
     "agora-rtc-sdk-ng": "^4.24.0",
+    "agora-access-token": "^2.0.4",
     "d3-scale": "^4.0.2",
     "d3-scale-chromatic": "^3.1.0",
     "lucide-react": "^0.577.0",

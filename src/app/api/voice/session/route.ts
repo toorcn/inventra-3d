@@ -1,4 +1,4 @@
-import { getAgoraVoiceConfig, hasAgoraVoiceConfig } from "@/lib/agora";
+import { buildAgoraRtcToken, getAgoraVoiceConfig, hasAgoraVoiceConfig } from "@/lib/agora";
 import {
   clearVoiceSessionPendingActions,
   createVoiceSession,
@@ -101,7 +101,7 @@ export async function POST(request: Request): Promise<Response> {
       appId: config.appId,
       channelName: session.channelName,
       rtcUid: session.rtcUid,
-      rtcToken: null,
+      rtcToken: buildAgoraRtcToken(session.channelName, session.rtcUid),
       status: session.status,
       partialTranscript: session.partialTranscript,
       cursor: session.cursor,

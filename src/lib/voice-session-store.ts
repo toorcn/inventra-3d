@@ -28,7 +28,13 @@ type CreateVoiceSessionInput = {
   componentId?: string;
 };
 
-const sessions = new Map<string, VoiceSessionRecord>();
+declare global {
+  var __inventornetVoiceSessions__: Map<string, VoiceSessionRecord> | undefined;
+}
+
+const sessions =
+  globalThis.__inventornetVoiceSessions__ ??
+  (globalThis.__inventornetVoiceSessions__ = new Map<string, VoiceSessionRecord>());
 
 function now(): number {
   return Date.now();

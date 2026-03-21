@@ -108,11 +108,16 @@ export function useVoiceSession({
   const sessionIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef(1200);
   const destroyedRef = useRef(false);
+  const statusRef = useRef<VoiceSessionStatus>("idle");
 
   const [error, setError] = useState<string | null>(null);
   const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<VoiceSessionStatus>("idle");
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const stopPolling = useCallback(() => {
     if (pollTimeoutRef.current !== null) {
@@ -145,6 +150,42 @@ export function useVoiceSession({
       }
     }
   }, []);
+
+  const cleanupVoiceSession = useCallback(
+    async ({ announceDisconnect }: { announceDisconnect: boolean }) => {
+      stopPolling();
+      const activeSessionId = sessionIdRef.current;
+      sessionIdRef.current = null;
+      setSessionId(null);
+      setPartialTranscript(null);
+
+      if (announceDisconnect && statusRef.current !== "disabled") {
+        setStatus("disconnecting");
+      }
+
+      try {
+        if (activeSessionId) {
+          await fetch("/api/voice/agent/remove", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ sessionId: activeSessionId }),
+          });
+        }
+      } catch {
+        // Local teardown still needs to proceed.
+      } finally {
+        cursorRef.current = 0;
+        await teardownRtc();
+        if (!destroyedRef.current && announceDisconnect) {
+          setStatus((current) => (current === "disabled" ? "disabled" : "idle"));
+          setError(null);
+        }
+      }
+    },
+    [stopPolling, teardownRtc],
+  );
 
   const getAgoraModule = useCallback(async () => {
     if (!agoraModuleRef.current) {
@@ -242,37 +283,8 @@ export function useVoiceSession({
   }, []);
 
   const disconnectVoice = useCallback(async () => {
-    stopPolling();
-    const activeSessionId = sessionIdRef.current;
-    sessionIdRef.current = null;
-    setSessionId(null);
-    setPartialTranscript(null);
-
-    if (status !== "disabled") {
-      setStatus("disconnecting");
-    }
-
-    try {
-      if (activeSessionId) {
-        await fetch("/api/voice/agent/remove", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ sessionId: activeSessionId }),
-        });
-      }
-    } catch {
-      // Local teardown still needs to proceed.
-    } finally {
-      cursorRef.current = 0;
-      await teardownRtc();
-      if (!destroyedRef.current) {
-        setStatus((current) => (current === "disabled" ? "disabled" : "idle"));
-        setError(null);
-      }
-    }
-  }, [status, stopPolling, teardownRtc]);
+    await cleanupVoiceSession({ announceDisconnect: true });
+  }, [cleanupVoiceSession]);
 
   const connectVoice = useCallback(async () => {
     if (status === "disabled" || status === "connecting" || status === "disconnecting") {
@@ -377,7 +389,7 @@ export function useVoiceSession({
       if (nextSessionId) {
         sessionIdRef.current = nextSessionId;
         setSessionId(nextSessionId);
-        await disconnectVoice();
+        await cleanupVoiceSession({ announceDisconnect: false });
       } else {
         await teardownRtc();
       }
@@ -389,6 +401,7 @@ export function useVoiceSession({
     }
   }, [
     componentId,
+    cleanupVoiceSession,
     disconnectVoice,
     getAgoraModule,
     inventionId,
@@ -411,6 +424,36 @@ export function useVoiceSession({
   }, [refreshAvailability]);
 
   useEffect(() => {
+    destroyedRef.current = false;
+
+    return () => {
+      destroyedRef.current = true;
+      stopPolling();
+      const client = clientRef.current;
+      const localTrack = localAudioTrackRef.current;
+
+      localAudioTrackRef.current = null;
+      clientRef.current = null;
+      sessionIdRef.current = null;
+
+      if (localTrack) {
+        try {
+          localTrack.stop();
+          localTrack.close();
+        } catch {
+          // Ignore track cleanup errors during unmount.
+        }
+      }
+
+      if (client) {
+        void client.leave().catch(() => {
+          // Ignore leave failures during unmount.
+        });
+      }
+    };
+  }, [stopPolling]);
+
+  useEffect(() => {
     if (!sessionIdRef.current) {
       return;
     }
@@ -427,14 +470,6 @@ export function useVoiceSession({
       }),
     });
   }, [componentId, inventionId]);
-
-  useEffect(() => {
-    return () => {
-      destroyedRef.current = true;
-      stopPolling();
-      void disconnectVoice();
-    };
-  }, [disconnectVoice, stopPolling]);
 
   return {
     error,

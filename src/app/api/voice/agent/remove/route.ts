@@ -35,6 +35,13 @@ export async function POST(request: Request): Promise<Response> {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown voice remove error";
+    console.error("[voice][agent/remove] failed", {
+      message,
+      cause:
+        error instanceof Error && "cause" in error
+          ? error.cause
+          : undefined,
+    });
     return Response.json({ error: message }, { status: 500 });
   }
 }

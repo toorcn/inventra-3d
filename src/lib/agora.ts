@@ -1,13 +1,16 @@
 import { buildInventionContext } from "@/lib/invention-context";
 import type { Invention, InventionComponent, VoiceAgentWebhookRequest } from "@/types";
+import { RtcRole, RtcTokenBuilder } from "agora-access-token";
 import type { VoiceSessionRecord } from "./voice-session-store";
 
 const DEFAULT_ELEVENLABS_MODEL = "eleven_multilingual_v2";
 const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.0-flash-001";
 const AGORA_CONVO_AI_BASE_URL = "https://api.agora.io/api/conversational-ai-agent/v2/projects";
+const RTC_TOKEN_LIFETIME_SECONDS = 60 * 60;
 
 type AgoraVoiceConfig = {
   appId: string;
+  appCertificate: string;
   customerId: string;
   customerSecret: string;
   appUrl: string;
@@ -76,6 +79,7 @@ function readEnv(name: string): string | undefined {
 export function hasAgoraVoiceConfig(): boolean {
   return Boolean(
     readEnv("NEXT_PUBLIC_AGORA_APP_ID") &&
+      readEnv("AGORA_APP_CERTIFICATE") &&
       readEnv("AGORA_CUSTOMER_ID") &&
       readEnv("AGORA_CUSTOMER_SECRET") &&
       readEnv("ELEVENLABS_API_KEY") &&
@@ -85,6 +89,7 @@ export function hasAgoraVoiceConfig(): boolean {
 
 export function getAgoraVoiceConfig(): AgoraVoiceConfig {
   const appId = readEnv("NEXT_PUBLIC_AGORA_APP_ID");
+  const appCertificate = readEnv("AGORA_APP_CERTIFICATE");
   const customerId = readEnv("AGORA_CUSTOMER_ID");
   const customerSecret = readEnv("AGORA_CUSTOMER_SECRET");
   const elevenLabsApiKey = readEnv("ELEVENLABS_API_KEY");
@@ -92,6 +97,7 @@ export function getAgoraVoiceConfig(): AgoraVoiceConfig {
 
   const missing = [
     ["NEXT_PUBLIC_AGORA_APP_ID", appId],
+    ["AGORA_APP_CERTIFICATE", appCertificate],
     ["AGORA_CUSTOMER_ID", customerId],
     ["AGORA_CUSTOMER_SECRET", customerSecret],
     ["ELEVENLABS_API_KEY", elevenLabsApiKey],
@@ -105,6 +111,7 @@ export function getAgoraVoiceConfig(): AgoraVoiceConfig {
 
   return {
     appId: appId!,
+    appCertificate: appCertificate!,
     customerId: customerId!,
     customerSecret: customerSecret!,
     appUrl: readEnv("NEXT_PUBLIC_APP_URL") ?? "http://localhost:3000",
@@ -135,12 +142,13 @@ export function buildAgoraAgentJoinPayload(
 ): AgoraAgentJoinPayload {
   const config = getAgoraVoiceConfig();
   const systemMessage = buildInventionContext(invention, component);
+  const agentRtcToken = buildAgoraRtcToken(session.channelName, session.agentRtcUid);
 
   return {
     name: `inventornet-agent-${session.sessionId}`,
     properties: {
       channel: session.channelName,
-      token: "",
+      token: agentRtcToken,
       agent_rtc_uid: String(session.agentRtcUid),
       remote_rtc_uids: [String(session.rtcUid)],
       idle_timeout: 300,
@@ -187,6 +195,21 @@ export function buildAgoraAgentJoinPayload(
   };
 }
 
+export function buildAgoraRtcToken(channelName: string, uid: number, privilegeExpiredTs?: number): string {
+  const config = getAgoraVoiceConfig();
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = privilegeExpiredTs ?? issuedAt + RTC_TOKEN_LIFETIME_SECONDS;
+
+  return RtcTokenBuilder.buildTokenWithUid(
+    config.appId,
+    config.appCertificate,
+    channelName,
+    uid,
+    RtcRole.PUBLISHER,
+    expiresAt,
+  );
+}
+
 async function callAgora(path: string, init: RequestInit): Promise<Response> {
   const config = getAgoraVoiceConfig();
 
@@ -200,6 +223,14 @@ async function callAgora(path: string, init: RequestInit): Promise<Response> {
   });
 }
 
+async function readAgoraErrorBody(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return "<unreadable response body>";
+  }
+}
+
 export async function inviteAgoraAgent(
   session: VoiceSessionRecord,
   invention: Invention,
@@ -211,8 +242,8 @@ export async function inviteAgoraAgent(
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Agora agent invite failed (${response.status}): ${body}`);
+    const body = await readAgoraErrorBody(response);
+    throw new Error(`Agora agent invite failed [POST /join] (${response.status}): ${body}`);
   }
 
   const payload = (await response.json()) as AgoraAgentJoinResponse;
@@ -232,8 +263,8 @@ export async function removeAgoraAgent(agentId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Agora agent remove failed (${response.status}): ${body}`);
+    const body = await readAgoraErrorBody(response);
+    throw new Error(`Agora agent remove failed [POST /agents/${agentId}/leave] (${response.status}): ${body}`);
   }
 }
 
@@ -252,8 +283,8 @@ export async function speakAgoraAgent(agentId: string, text: string): Promise<vo
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Agora agent speak failed (${response.status}): ${body}`);
+    const body = await readAgoraErrorBody(response);
+    throw new Error(`Agora agent speak failed [POST /agents/${agentId}/speak] (${response.status}): ${body}`);
   }
 }
 

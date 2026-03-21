@@ -3,6 +3,7 @@ import { getVoiceConfig } from "@/lib/voice";
 
 const trackedKeys = [
   "NEXT_PUBLIC_AGORA_APP_ID",
+  "AGORA_APP_CERTIFICATE",
   "AGORA_CUSTOMER_ID",
   "AGORA_CUSTOMER_SECRET",
   "ELEVENLABS_API_KEY",
@@ -39,6 +40,7 @@ describe("getVoiceConfig", () => {
 
   it("uses defaults when optional overrides are omitted", () => {
     process.env.NEXT_PUBLIC_AGORA_APP_ID = "test-app-id";
+    process.env.AGORA_APP_CERTIFICATE = "test-certificate";
     process.env.AGORA_CUSTOMER_ID = "test-customer";
     process.env.AGORA_CUSTOMER_SECRET = "test-secret";
     process.env.ELEVENLABS_API_KEY = "test-elevenlabs";
@@ -49,6 +51,7 @@ describe("getVoiceConfig", () => {
     const config = getVoiceConfig();
 
     expect(config.appId).toBe("test-app-id");
+    expect(config.appCertificate).toBe("test-certificate");
     expect(config.customerId).toBe("test-customer");
     expect(config.customerSecret).toBe("test-secret");
     expect(config.elevenLabsApiKey).toBe("test-elevenlabs");

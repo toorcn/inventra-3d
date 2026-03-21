@@ -12,6 +12,7 @@ import {
 
 const trackedKeys = [
   "NEXT_PUBLIC_AGORA_APP_ID",
+  "AGORA_APP_CERTIFICATE",
   "AGORA_CUSTOMER_ID",
   "AGORA_CUSTOMER_SECRET",
   "ELEVENLABS_API_KEY",
@@ -27,6 +28,7 @@ const originalValues = Object.fromEntries(
 
 function setConfiguredVoiceEnv() {
   process.env.NEXT_PUBLIC_AGORA_APP_ID = "test-app-id";
+  process.env.AGORA_APP_CERTIFICATE = "test-app-certificate";
   process.env.AGORA_CUSTOMER_ID = "test-customer-id";
   process.env.AGORA_CUSTOMER_SECRET = "test-customer-secret";
   process.env.ELEVENLABS_API_KEY = "test-elevenlabs-key";
@@ -96,6 +98,8 @@ describe("voice routes", () => {
     expect(payload.channelName).toContain("inventornet-");
     expect(payload.appId).toBe("test-app-id");
     expect(typeof payload.rtcUid).toBe("number");
+    expect(typeof payload.rtcToken).toBe("string");
+    expect(payload.rtcToken?.length).toBeGreaterThan(10);
   });
 
   it("builds the expected Agora invite payload and stores the agent id", async () => {
@@ -129,6 +133,7 @@ describe("voice routes", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const requestBody = JSON.parse(String(init.body)) as {
       properties: {
+        token: string;
         llm: {
           url: string;
           api_key: string;
@@ -150,6 +155,7 @@ describe("voice routes", () => {
     expect(url).toContain("/join");
     expect(requestBody.properties.llm.url).toContain(`/api/voice/llm?sessionId=${session.sessionId}`);
     expect(requestBody.properties.llm.api_key).toBe(session.llmApiKey);
+    expect(requestBody.properties.token.length).toBeGreaterThan(10);
     expect(requestBody.properties.tts.vendor).toBe("elevenlabs");
     expect(requestBody.properties.tts.params.voice_id).toBe("test-voice-id");
     expect(getVoiceSession(session.sessionId).agentId).toBe("agent-123");
