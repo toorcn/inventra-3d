@@ -6,7 +6,7 @@ export const GESTURE_CONTINUOUS_GRACE_FRAME_COUNT = 2;
 export const GESTURE_COMMAND_COOLDOWN_MS = 1200;
 export const GESTURE_FRAME_INTERVAL_MS = Math.round(1000 / 12);
 export const VIEWER_ROTATION_SMOOTHING = 0.35;
-export const VIEWER_ROTATION_SENSITIVITY = 4.2;
+export const VIEWER_ROTATION_SENSITIVITY = 6;
 export const VIEWER_PITCH_LIMIT = 0.9;
 
 export const DEFAULT_VIEWER_TRANSFORM: ViewerTransform = {
@@ -244,7 +244,7 @@ export function applySmoothedRotation(
   const pitchStep = delta.y * sensitivity * smoothing;
 
   return {
-    rotationX: clampViewerPitch(transform.rotationX - pitchStep),
-    rotationY: transform.rotationY + yawStep,
+    rotationX: clampViewerPitch(transform.rotationX + pitchStep),
+    rotationY: transform.rotationY - yawStep,
   };
 }
