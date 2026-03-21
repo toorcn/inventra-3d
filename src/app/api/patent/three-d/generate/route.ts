@@ -162,6 +162,20 @@ export async function POST(request: Request): Promise<Response> {
           { status: 400 },
         );
       }
+
+      if (component.threeDAsset && !forceRegenerate) {
+        return Response.json(
+          {
+            workspace,
+          },
+          {
+            status: 200,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
     }
 
     for (const targetId of targetComponentIds) {
@@ -230,6 +244,10 @@ export async function POST(request: Request): Promise<Response> {
             threeDError: "This component is still too ambiguous for standalone 3D generation.",
           });
           await writePatentWorkspaceManifest(currentWorkspace);
+          continue;
+        }
+
+        if (component.threeDAsset && !forceRegenerate) {
           continue;
         }
 

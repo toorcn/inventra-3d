@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { hasFalApiKey } from "@/lib/patent-image-enhancer";
 import { resolveComponentPosition } from "@/lib/patent-assembly-inference";
@@ -12,7 +11,11 @@ import type {
   PatentWorkspaceManifest,
   SpatialRelationship,
 } from "@/lib/patent-workspace";
-import { ensurePatentWorkspaceDirectories } from "@/lib/patent-workspace-store";
+import {
+  getPatentWorkspaceDiskPaths,
+  readPatentWorkspaceArtifact,
+  writePatentWorkspaceBinary,
+} from "@/lib/patent-workspace-store";
 
 const FAL_TRELLIS_MODEL = "fal-ai/trellis-2";
 
@@ -403,8 +406,7 @@ export async function generatePatentThreeDAsset(input: {
     throw new Error("FAL_KEY is missing. Add it to enable fal.ai Trellis 2 generation.");
   }
 
-  const sourceAbsolutePath = path.join(process.cwd(), "public", input.sourceImage.outputPath.replace(/^\/+/, ""));
-  const sourceBuffer = await readFile(sourceAbsolutePath);
+  const sourceBuffer = await readPatentWorkspaceArtifact(input.sourceImage.outputPath);
   const sourceMimeType = getMimeTypeFromPath(input.sourceImage.outputPath);
 
   const response = await fetch(`https://fal.run/${FAL_TRELLIS_MODEL}`, {
@@ -442,12 +444,16 @@ export async function generatePatentThreeDAsset(input: {
   }
 
   const glbBuffer = Buffer.from(await glbResponse.arrayBuffer());
-  const diskPaths = await ensurePatentWorkspaceDirectories(input.patentId);
+  const diskPaths = getPatentWorkspaceDiskPaths(input.patentId);
   const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
   const outputFilename = `${sanitizeOutputToken(input.component.canonicalName || input.component.id)}-${timestamp}.glb`;
-  const outputAbsolutePath = path.join(diskPaths.threeDAbsoluteDirectory, outputFilename);
-  const outputPath = `${diskPaths.publicPaths.threeDDirectory}/${outputFilename}`;
-  await writeFile(outputAbsolutePath, glbBuffer);
+  const outputPath = await writePatentWorkspaceBinary(
+    path.posix.join(diskPaths.threeDDirectoryRelative, outputFilename),
+    glbBuffer,
+    {
+      contentType: "model/gltf-binary",
+    },
+  );
 
   return {
     asset: {

@@ -308,7 +308,10 @@ export type PatentWorkspaceStats = {
   generatedCount: number;
 };
 
+export const PATENT_WORKSPACE_SCHEMA_VERSION = 2;
+
 export type PatentWorkspaceManifest = {
+  schemaVersion: number;
   patentId: string;
   sourceFilename: string;
   totalPages: number;
@@ -1688,7 +1691,15 @@ function planPatentWorkspaceStructure(
 export function createPatentWorkspaceManifest(
   base: Omit<
     PatentWorkspaceManifest,
-    "componentCandidates" | "componentLibrary" | "referenceIndex" | "productModel" | "assemblies" | "reviewState" | "stats" | "featured"
+    | "schemaVersion"
+    | "componentCandidates"
+    | "componentLibrary"
+    | "referenceIndex"
+    | "productModel"
+    | "assemblies"
+    | "reviewState"
+    | "stats"
+    | "featured"
   >,
 ): PatentWorkspaceManifest {
   const componentCandidates = base.figures.flatMap((figure) =>
@@ -1741,6 +1752,7 @@ export function createPatentWorkspaceManifest(
   );
   const initialReviewState = buildReviewState(planned.componentLibrary);
   const workspaceWithoutStats: Omit<PatentWorkspaceManifest, "stats"> = {
+    schemaVersion: PATENT_WORKSPACE_SCHEMA_VERSION,
     ...base,
     componentCandidates,
     figures: planned.figures,

@@ -33,11 +33,14 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 Create `.env.local` in the project root:
 
 ```bash
-# Enables real AI responses via OpenRouter (chat + structured search parsing).
+# Enables OpenRouter Gemini chat/search/vision and Nano Banana image generation.
 OPENROUTER_API_KEY=...
 
-# Enables Google Gemini image-to-image enhancement for extracted patent figures.
-GEMINI_API_KEY=...
+# Enables fal.ai Trellis 2 image-to-3D generation.
+FAL_KEY=...
+
+# Enables Vercel Blob-backed patent workspace caching.
+BLOB_READ_WRITE_TOKEN=...
 
 # Used for OpenRouter headers (optional).
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -60,8 +63,9 @@ npm run test:watch # vitest in watch mode
 - **3D models / exploded view**: React Three Fiber + drei + three
 - **UI**: Tailwind CSS
 - **AI**: OpenRouter (server route at `src/app/api/chat/route.ts`)
-- **Patent PDF extraction (POC)**: `pdfjs-dist` + `canvas` + OpenRouter vision (`src/app/api/patent/extract/route.ts`)
-- **Patent figure enhancement (POC)**: Google Gemini native image generation / Nano Banana (`src/app/api/patent/enhance/route.ts`)
+- **Patent PDF extraction + component normalization (POC)**: `pdfjs-dist` + `canvas` + OpenRouter vision (`src/app/api/patent/extract/route.ts`)
+- **Patent component generation (POC)**: OpenRouter Nano Banana image generation/editing (`src/app/api/patent/components/generate/route.ts`)
+- **Patent hero/subassembly 3D generation (POC)**: fal.ai Trellis 2 mesh generation (`src/app/api/patent/three-d/generate/route.ts`)
 
 ## Project structure
 
@@ -69,12 +73,20 @@ npm run test:watch # vitest in watch mode
 - `src/app/invention/[id]/page.tsx`: invention detail + 3D viewer + AI chat
 - `src/app/api/search/route.ts`: search endpoint (filters inventions)
 - `src/app/api/chat/route.ts`: AI chat endpoint (returns plain text)
-- `src/app/api/patent/extract/route.ts`: patent PDF upload + figure/text extraction endpoint
+- `src/app/api/patent/extract/route.ts`: patent PDF upload + patent workspace extraction endpoint
+- `src/app/api/patent/components/review/route.ts`: component triage persistence endpoint
+- `src/app/api/patent/components/generate/route.ts`: variant-aware component image generation endpoint
+- `src/app/api/patent/three-d/generate/route.ts`: featured hero + subassembly Trellis 2 generation endpoint
 - `src/data/*`: invention dataset, categories, 3D component definitions
 
 ## Patent PDF Extraction (POC)
 
-This project includes a POC endpoint to extract patent figure pages and context from uploaded PDFs.
+This project includes a POC workflow to turn a patent PDF into an auto-reviewed component asset library with:
+
+- a generated assembled-product hero image,
+- generated subassembly images,
+- stricter `three_d_source` image variants for featured hero/subassemblies,
+- and optional Trellis 2 `GLB` outputs for the featured 3D set.
 
 ### Endpoint
 
@@ -82,30 +94,37 @@ This project includes a POC endpoint to extract patent figure pages and context 
 - Content type: `multipart/form-data`
 - Fields:
   - `file` (required): patent PDF file
-  - `patentId` (optional): custom ID used for output folder naming
+  - `patentId` (optional): deterministic cache key; when omitted, the PDF filename slug is used
 
 ### Response
 
-Returns JSON with extracted figures and output paths:
+Returns a patent workspace JSON document containing:
 
 - `patentId`
-- `outputDirectory`
-- `manifestPath`
-- `textPath`
 - `totalPages`
 - `processedPages`
-- `figureCount`
+- `paths`
+- `stats`
 - `warnings[]`
+- `capabilities`
 - `figures[]` (label, page number, description, components, image filename)
+- `componentCandidates[]` (raw per-figure detections)
+- `componentLibrary[]` (deduped canonical components for review/generation)
+- `assemblies[]`
+- `reviewState`
+- `featured` (hero component + auto-identified subassemblies)
 
 ### Output Files
 
-The API writes extracted artifacts to `public/patents/{patentId}/`:
+The API caches extracted artifacts in Vercel Blob when `BLOB_READ_WRITE_TOKEN` is configured, with local `public/patents/{patentId}/` storage as the development fallback:
 
 - `manifest.json`
 - `full-text.txt`
 - `page-<n>-fig-<label>.png` figure images
-- `enhanced/*.png|jpg|webp` realistic figure-to-product renders generated on demand
+- `components/candidates/*.png` raw component evidence crops
+- `components/generated/*-realistic_display.(png|jpg|webp)` presentation-ready component renders
+- `components/generated/*-three_d_source.(png|jpg|webp)` stricter image-to-3D source renders for featured items
+- `components/3d/*.glb` Trellis 2 output meshes for the featured hero/subassembly set
 
 ### Example curl
 
@@ -117,17 +136,19 @@ curl -X POST http://localhost:3000/api/patent/extract \
 
 ### Behavior and fallback
 
-- If `OPENROUTER_API_KEY` is configured, page images are analyzed by a vision-capable model to identify figure pages and infer component names/reference numbers.
-- If `GEMINI_API_KEY` is configured, each extracted figure card can also trigger a second-stage image-to-image pass that converts the patent sketch/crop into a more realistic component render.
+- If `OPENROUTER_API_KEY` is configured, page images are analyzed by a vision-capable model to identify figure pages, candidate parts, likely subassemblies, and functional descriptions.
+- The extractor now auto-reviews strong candidates, skips obviously weak/text-heavy crops, and promotes one best-supported assembled view into a hero component.
+- If `OPENROUTER_API_KEY` is configured, the UI can generate the assembled hero image first and generate featured `three_d_source` images on demand with Nano Banana. If `FAL_KEY` is also configured, it can convert the featured hero/subassembly set into Trellis 2 `GLB` files.
 - Without API key, extraction still runs with heuristics (e.g., FIG label detection), but figure classification and component naming will be lower fidelity.
-- Each extracted figure includes `analysisSource` (`vision` or `heuristic`) and `failureReason` (when falling back).
+- Review decisions, hero selection, image variants, 3D mesh status, and assembly contracts are persisted into the patent workspace manifest so the inline flow survives reloads.
 
 ### Limits and deployment notes
 
 - Current endpoint enforces a `50MB` PDF size cap.
 - Page processing defaults to first `60` pages (set via `PATENT_EXTRACT_MAX_PAGES`).
 - This route requires Node.js runtime (`runtime = "nodejs"`).
-- Writing to `public/` is suitable for local/dev POC. Serverless production deployments usually require object storage (S3/Vercel Blob/etc.) because local filesystem writes are ephemeral/read-only.
+- Patent workspace caching is patent-ID-first. Reusing the same patent ID reopens the cached workspace instead of reprocessing the PDF.
+- Local `public/` writes remain the local/dev fallback. In serverless deployments, Blob storage avoids ephemeral filesystem issues.
 
 ## Notes
 

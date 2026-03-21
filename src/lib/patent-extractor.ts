@@ -1,9 +1,8 @@
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { hasOpenRouterApiKey } from "@/lib/openrouter";
 import { triageCropQuality, validateCropQuality } from "@/lib/patent-crop-validator";
-import { hasPatentImageEnhancementApiKey } from "@/lib/patent-image-enhancer";
+import { hasFalApiKey, hasPatentImageEnhancementApiKey } from "@/lib/patent-image-enhancer";
 import {
   createPatentWorkspaceManifest,
   type CropValidation,
@@ -15,7 +14,13 @@ import {
   type PatentFigureComponentDetection,
   type PatentScaleHints,
 } from "@/lib/patent-workspace";
-import { ensurePatentWorkspaceDirectories, writePatentWorkspaceManifest } from "@/lib/patent-workspace-store";
+import {
+  getPatentWorkspaceDiskPaths,
+  readPatentWorkspaceManifestIfCompatible,
+  writePatentWorkspaceBinary,
+  writePatentWorkspaceManifest,
+  writePatentWorkspaceText,
+} from "@/lib/patent-workspace-store";
 
 type PatentExtractionInput = {
   pdfBuffer: Buffer;
@@ -305,11 +310,10 @@ function slugify(input: string): string {
     .slice(0, 60);
 }
 
-function createPatentId(sourceFilename: string, patentId?: string): string {
+export function createPatentId(sourceFilename: string, patentId?: string): string {
   const base = patentId?.trim() ? patentId : sourceFilename;
   const normalized = slugify(base);
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-  return normalized ? `${normalized}-${stamp}` : `patent-${stamp}`;
+  return normalized || "patent";
 }
 
 function sanitizeFileToken(token: string): string {
@@ -705,7 +709,17 @@ function buildFallbackRegions(
 
 export async function extractPatentFigures(input: PatentExtractionInput): Promise<PatentExtractionResult> {
   const patentId = createPatentId(input.sourceFilename, input.patentId);
-  const diskPaths = await ensurePatentWorkspaceDirectories(patentId);
+  const cachedManifest = await readPatentWorkspaceManifestIfCompatible(patentId);
+  if (cachedManifest) {
+    return {
+      outputDirectory: cachedManifest.paths.outputDirectory,
+      manifestPath: cachedManifest.paths.manifestPath,
+      textPath: cachedManifest.paths.textPath,
+      manifest: cachedManifest,
+    };
+  }
+
+  const diskPaths = getPatentWorkspaceDiskPaths(patentId);
 
   const pdfjsLib = await loadPdfJsModule();
   const documentTask = pdfjsLib.getDocument({
@@ -761,13 +775,14 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
       const label = analysis.labels[0] ?? extractFigureLabels(pageText)[0] ?? `FIG. P${pageNumber}`;
       const safeLabel = sanitizeFileToken(label.replace(/^fig\.?\s*/i, "fig-"));
       const filename = `page-${pageNumber}-${safeLabel || `fig-p${pageNumber}`}.png`;
-      const figureAbsolutePath = path.join(diskPaths.rootAbsolute, filename);
-      const figureImagePath = `${diskPaths.publicPaths.outputDirectory}/${filename}`;
+      const figureRelativePath = path.posix.join(diskPaths.rootRelative, filename);
 
       const cropRegion = pickBestRegion(analysis.figureRegions);
       const expandedFigureRegion = cropRegion ? expandRegion(cropRegion, 0.04) : null;
       const imageToWrite = expandedFigureRegion ? await cropImageByRegion(imageBuffer, expandedFigureRegion) : imageBuffer;
-      await writeFile(figureAbsolutePath, imageToWrite);
+      const figureImagePath = await writePatentWorkspaceBinary(figureRelativePath, imageToWrite, {
+        contentType: "image/png",
+      });
       const figureQuality = await analyzeCropQuality(imageToWrite);
 
       const detectionInputs =
@@ -829,9 +844,13 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
           }
 
           imageFilename = `candidate-p${pageNumber}-${safeLabel}-${componentToken}.png`;
-          const candidateAbsolutePath = path.join(diskPaths.candidateAbsoluteDirectory, imageFilename);
-          await writeFile(candidateAbsolutePath, detectionBuffer);
-          imagePath = `${diskPaths.publicPaths.candidateDirectory}/${imageFilename}`;
+          imagePath = await writePatentWorkspaceBinary(
+            path.posix.join(diskPaths.candidateDirectoryRelative, imageFilename),
+            detectionBuffer,
+            {
+              contentType: "image/png",
+            },
+          );
         }
 
         componentDetections.push({
@@ -891,30 +910,33 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
   }
 
   const extractedText = pagesText.join("\n\n").trim();
-  await writeFile(diskPaths.textAbsolute, extractedText, "utf8");
+  const textPath = await writePatentWorkspaceText(patentId, extractedText);
 
-  const manifest = createPatentWorkspaceManifest({
-    patentId,
-    sourceFilename: input.sourceFilename,
-    totalPages: pdf.numPages,
-    processedPages: pagesToProcess,
-    extractedAt: new Date().toISOString(),
-    extractedText,
-    warnings,
-    capabilities: {
-      imageGeneration: hasPatentImageEnhancementApiKey(),
-      threeDGeneration: false,
-    },
-    paths: diskPaths.publicPaths,
-    figures,
-  });
-
-  await writePatentWorkspaceManifest(manifest);
+  const manifest = await writePatentWorkspaceManifest(
+    createPatentWorkspaceManifest({
+      patentId,
+      sourceFilename: input.sourceFilename,
+      totalPages: pdf.numPages,
+      processedPages: pagesToProcess,
+      extractedAt: new Date().toISOString(),
+      extractedText,
+      warnings,
+      capabilities: {
+        imageGeneration: hasPatentImageEnhancementApiKey(),
+        threeDGeneration: hasFalApiKey(),
+      },
+      paths: {
+        ...diskPaths.publicPaths,
+        textPath,
+      },
+      figures,
+    }),
+  );
 
   return {
-    outputDirectory: diskPaths.publicPaths.outputDirectory,
-    manifestPath: diskPaths.publicPaths.manifestPath,
-    textPath: diskPaths.publicPaths.textPath,
+    outputDirectory: manifest.paths.outputDirectory,
+    manifestPath: manifest.paths.manifestPath,
+    textPath: manifest.paths.textPath,
     manifest,
   };
 }

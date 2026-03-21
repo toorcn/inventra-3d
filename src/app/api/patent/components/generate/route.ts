@@ -1,5 +1,6 @@
 import { generatePatentComponentImageVariant } from "@/lib/patent-component-image-generator";
 import {
+  getPatentComponentImageAsset,
   updatePatentComponentImageGeneration,
   type PatentComponentRecord,
   type PatentGeneratedImageAsset,
@@ -14,6 +15,7 @@ type PatentGenerateRequest = {
   patentId?: string;
   componentId?: string;
   variant?: PatentImageVariant;
+  forceRegenerate?: boolean;
 };
 
 let generationQueue: Promise<void> = Promise.resolve();
@@ -66,6 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     const patentId = body.patentId?.trim();
     const componentId = body.componentId?.trim();
     const variant = body.variant === "three_d_source" ? "three_d_source" : "realistic_display";
+    const forceRegenerate = Boolean(body.forceRegenerate);
 
     if (!patentId || !isSafePatentId(patentId)) {
       return Response.json({ error: "Invalid patentId" }, { status: 400 });
@@ -86,6 +89,20 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    if (getPatentComponentImageAsset(component, variant) && !forceRegenerate) {
+      return Response.json(
+        {
+          workspace,
+        },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
     const queuedWorkspace = updatePatentComponentImageGeneration(workspace, componentId, variant, {
       status: "queued",
       error: null,
@@ -102,6 +119,10 @@ export async function POST(request: Request): Promise<Response> {
           error: "This component is still too ambiguous to generate directly.",
         });
         await writePatentWorkspaceManifest(workspace);
+        return workspace;
+      }
+
+      if (getPatentComponentImageAsset(currentComponent, variant) && !forceRegenerate) {
         return workspace;
       }
 

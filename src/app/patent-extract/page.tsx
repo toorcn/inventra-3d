@@ -377,7 +377,7 @@ export default function PatentExtractPage() {
     }
 
     try {
-      const response = await fetch(`/patents/${patentId}/manifest.json?ts=${Date.now()}`, {
+      const response = await fetch(`/api/patent/workspace?patentId=${encodeURIComponent(patentId)}&ts=${Date.now()}`, {
         cache: "no-store",
       });
       if (!response.ok) {
@@ -508,6 +508,9 @@ export default function PatentExtractPage() {
       return;
     }
 
+    const component = workspace.componentLibrary.find((item) => item.id === componentId);
+    const forceRegenerate = Boolean(component && getImageVariantAsset(component, variant));
+
     setGenerationLoadingById((current) => ({ ...current, [componentId]: true }));
     setError(null);
 
@@ -521,6 +524,7 @@ export default function PatentExtractPage() {
           patentId: workspace.patentId,
           componentId,
           variant,
+          forceRegenerate,
         }),
       });
 
@@ -657,8 +661,8 @@ export default function PatentExtractPage() {
             </form>
 
             <div className="mt-3 text-xs text-[var(--text-secondary)]">
-              Files are persisted under{" "}
-              <code className="rounded bg-white/10 px-1.5 py-0.5 text-white">public/patents/&lt;patent-id&gt;</code>
+              Patent workspaces are cached in Vercel Blob when configured, with local workspace storage as the
+              development fallback.
             </div>
 
             {error ? (

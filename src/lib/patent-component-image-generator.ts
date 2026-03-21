@@ -1,4 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   enhancePatentComponentImage,
@@ -11,7 +10,11 @@ import type {
   PatentImageVariant,
   PatentWorkspaceManifest,
 } from "@/lib/patent-workspace";
-import { ensurePatentWorkspaceDirectories } from "@/lib/patent-workspace-store";
+import {
+  getPatentWorkspaceDiskPaths,
+  readPatentWorkspaceArtifact,
+  writePatentWorkspaceBinary,
+} from "@/lib/patent-workspace-store";
 
 function sanitizeOutputToken(value: string): string {
   return value
@@ -44,7 +47,7 @@ export async function generatePatentComponentImageVariant(
   component: PatentComponentRecord,
   variant: PatentImageVariant,
 ): Promise<PatentGeneratedImageAsset> {
-  const diskPaths = await ensurePatentWorkspaceDirectories(workspacePatentId);
+  const diskPaths = getPatentWorkspaceDiskPaths(workspacePatentId);
   const maxImages = variant === "three_d_source" ? 4 : 3;
   const sortedEvidence = [...component.evidence].sort(
     (a, b) =>
@@ -101,9 +104,8 @@ export async function generatePatentComponentImageVariant(
   }
   const referenceImages = await Promise.all(
     referenceImageSources.map(async (item) => {
-      const absolutePath = path.join(process.cwd(), "public", item.imagePath.replace(/^\/+/, ""));
       return {
-        imageBuffer: await readFile(absolutePath),
+        imageBuffer: await readPatentWorkspaceArtifact(item.imagePath),
         mimeType: getMimeTypeFromFilename(item.imageFilename),
       };
     }),
@@ -140,10 +142,13 @@ export async function generatePatentComponentImageVariant(
     const outputFilename = `${sanitizeOutputToken(component.canonicalName || component.id)}-${variant}-${timestamp}.${getImageExtensionForMimeType(
       generated.mimeType,
     )}`;
-    const outputAbsolutePath = path.join(diskPaths.generatedAbsoluteDirectory, outputFilename);
-    const outputPath = `${diskPaths.publicPaths.generatedDirectory}/${outputFilename}`;
-
-    await writeFile(outputAbsolutePath, generated.imageBuffer);
+    const outputPath = await writePatentWorkspaceBinary(
+      path.posix.join(diskPaths.generatedDirectoryRelative, outputFilename),
+      generated.imageBuffer,
+      {
+        contentType: generated.mimeType,
+      },
+    );
 
     return {
       outputPath,
