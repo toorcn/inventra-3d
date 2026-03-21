@@ -215,11 +215,18 @@ export async function processVoiceWebhookTurnStreaming({
   const conversationMessages = getVoiceSession(sessionId).messages;
   const messagesForLlm = toOpenRouterMessages(conversationMessages);
 
+  // Kick off both calls in parallel:
+  // - structured agent → extracts 3D viewer actions
+  // - prose stream     → generates the spoken response for TTS
+  // This way the prose model never has to disclaim tool use; it just describes
+  // what is happening naturally, and actions arrive as soon as they're ready.
+  const agentResultPromise = runExpertAgent(invention, messagesForLlm, component);
+
   const openRouterStream = await chatCompletionStream(
     [
       {
         role: "system",
-        content: `${systemPrompt}\n\nIMPORTANT: Reply with plain prose only. Do NOT include any tool calls, tool syntax, component IDs, or action references in your response. Viewer actions are handled separately.`,
+        content: `${systemPrompt}\n\nIMPORTANT: You are speaking aloud to the user. Reply with natural conversational prose only — no raw tool syntax, JSON, or action markers in your words. When asked to perform 3D viewer actions (explode, highlight, select a component, assemble, etc.) describe what you are doing naturally, for example "Let me explode the view so you can see each component." The viewer actions are executed automatically in parallel with your response.`,
       },
       ...messagesForLlm,
     ],
@@ -257,8 +264,8 @@ export async function processVoiceWebhookTurnStreaming({
       setVoiceSessionSpeaking(sessionId, fullContent);
       publishVoiceEvents(sessionId, [assistantMessage], [], "speaking", null);
 
-      // Background: run structured output for 3D viewer actions.
-      void runExpertAgent(invention, messagesForLlm, component)
+      // Emit viewer actions from the already-in-flight structured agent call.
+      void agentResultPromise
         .then(({ actions }) => {
           if (actions.length > 0) {
             try {
@@ -271,7 +278,7 @@ export async function processVoiceWebhookTurnStreaming({
                 null,
               );
             } catch {
-              // Session may have expired.
+              // Session may have expired by the time actions resolve.
             }
           }
         })
