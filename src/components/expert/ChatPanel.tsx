@@ -5,7 +5,7 @@ import { MessageBubble } from "./MessageBubble";
 import { SuggestedQuestions } from "./SuggestedQuestions";
 import type { ChatMessage, ChatResponse, TranscriptDelivery } from "@/types";
 import type { VoiceStatus } from "@/hooks/useVoiceSession";
-import { LoaderCircle, Mic, Send } from "lucide-react";
+import { LoaderCircle, Mic, MicOff, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ChatPanelProps {
@@ -15,9 +15,11 @@ interface ChatPanelProps {
   suggestedQuestions: string[];
   voiceStatus: VoiceStatus;
   voiceError: string | null;
+  voiceMuted: boolean;
   voicePartialTranscript: string | null;
   onSendMessage: (content: string, options?: { delivery?: TranscriptDelivery }) => Promise<ChatResponse>;
   onToggleVoiceConnection: () => void;
+  onToggleVoiceMute: () => void;
 }
 
 export function ChatPanel({
@@ -27,9 +29,11 @@ export function ChatPanel({
   suggestedQuestions,
   voiceStatus,
   voiceError,
+  voiceMuted,
   voicePartialTranscript,
   onSendMessage,
   onToggleVoiceConnection,
+  onToggleVoiceMute,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -77,7 +81,21 @@ export function ChatPanel({
                           : "Connect live voice or type below."}
           </p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {isVoiceConnected && (
+            <button
+              type="button"
+              onClick={onToggleVoiceMute}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                voiceMuted
+                  ? "border-amber-400/30 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                  : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+              }`}
+            >
+              {voiceMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+              {voiceMuted ? "Unmute" : "Mute"}
+            </button>
+          )}
           <button
             type="button"
             onClick={onToggleVoiceConnection}

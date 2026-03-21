@@ -275,10 +275,10 @@ export async function runExpertAgent(
         content: `${systemPrompt}
 
 Return JSON with:
-- reply: the visible answer to the user
+- reply: the visible answer to the user (plain prose only — no component IDs, no bracket references, no tool syntax)
 - toolCalls: an array of zero or more tool calls
 
-Do not include any tool syntax in reply.`,
+Do not embed component IDs or any tool syntax inside reply. Use toolCalls to trigger viewer actions instead.`,
       },
       ...messages,
     ],

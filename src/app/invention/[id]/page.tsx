@@ -305,9 +305,11 @@ export default function InventionDetailPage() {
             suggestedQuestions={suggestedQuestions}
             voiceStatus={voice.status}
             voiceError={voice.error}
+            voiceMuted={voice.isMuted}
             voicePartialTranscript={voice.partialTranscript}
             onSendMessage={handleConversationTurn}
             onToggleVoiceConnection={voice.toggleConnection}
+            onToggleVoiceMute={voice.toggleMute}
           />
         </aside>
       </section>

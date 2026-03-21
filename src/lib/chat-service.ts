@@ -3,7 +3,8 @@ import { getComponentById } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
 import { hasAgoraVoiceConfig, speakAgoraAgent } from "@/lib/agora";
 import { runExpertAgent } from "@/lib/expert-agent";
-import type { ChatMessage, ChatResponse, TranscriptDelivery } from "@/types";
+import { hasPusherConfig, pusherServer, voiceChannel } from "@/lib/pusher";
+import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery, VoiceSessionStatus } from "@/types";
 import {
   appendVoiceSessionMessage,
   enqueueVoiceSessionActions,
@@ -13,6 +14,25 @@ import {
   setVoiceSessionThinking,
   updateVoiceSessionContext,
 } from "./voice-session-store";
+
+function publishVoiceEvents(
+  sessionId: string,
+  messages: ChatMessage[],
+  actions: ExpertAction[],
+  status: VoiceSessionStatus,
+  partialTranscript: string | null,
+): void {
+  if (!hasPusherConfig() || !pusherServer) return;
+
+  const channel = voiceChannel(sessionId);
+  const batch: Array<{ channel: string; name: string; data: unknown }> = [
+    ...messages.map((msg) => ({ channel, name: "voice:message", data: msg })),
+    ...(actions.length ? [{ channel, name: "voice:actions", data: { actions } }] : []),
+    { channel, name: "voice:status", data: { status, partialTranscript } },
+  ];
+
+  void pusherServer.triggerBatch(batch).catch(() => {});
+}
 
 function toOpenRouterMessages(
   messages: ChatMessage[],
@@ -88,6 +108,9 @@ export async function processChatTurn({
       setVoiceSessionThinking(sessionId);
     }
     conversationMessages = getVoiceSession(sessionId).messages;
+
+    // Push user message immediately so the chat bubble appears before the LLM responds.
+    publishVoiceEvents(sessionId, [userMessage], [], "thinking", delivery === "spoken" ? userMessage.content : null);
   }
 
   const component =
@@ -126,6 +149,15 @@ export async function processChatTurn({
         setVoiceSessionListening(sessionId);
       }
     }
+
+    const finalSession = getVoiceSession(sessionId);
+    publishVoiceEvents(
+      sessionId,
+      [assistantMessage],
+      result.actions,
+      finalSession.status,
+      finalSession.partialTranscript,
+    );
   }
 
   return {

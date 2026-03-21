@@ -1,9 +1,9 @@
 "use client";
 
+import { getPusherClient } from "@/lib/pusher-client";
 import type {
   ChatMessage,
   ExpertAction,
-  VoiceSessionEvent,
   VoiceSessionPollResponse,
   VoiceSessionResponse,
   VoiceSessionStatus,
@@ -104,6 +104,7 @@ export function useVoiceSession({
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
   const pollTimeoutRef = useRef<number | null>(null);
+  const stopPusherRef = useRef<(() => void) | null>(null);
   const cursorRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef(1200);
@@ -111,6 +112,7 @@ export function useVoiceSession({
   const statusRef = useRef<VoiceSessionStatus>("idle");
 
   const [error, setError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<VoiceSessionStatus>("idle");
@@ -125,6 +127,48 @@ export function useVoiceSession({
       pollTimeoutRef.current = null;
     }
   }, []);
+
+  const stopPusher = useCallback(() => {
+    stopPusherRef.current?.();
+    stopPusherRef.current = null;
+  }, []);
+
+  const startPusher = useCallback(
+    async (activeSessionId: string) => {
+      const client = await getPusherClient();
+      if (!client || destroyedRef.current || sessionIdRef.current !== activeSessionId) return;
+
+      const channel = client.subscribe(`voice-${activeSessionId}`);
+
+      channel.bind("voice:message", (message: ChatMessage) => {
+        if (sessionIdRef.current === activeSessionId) {
+          onMessages?.([message]);
+        }
+      });
+
+      channel.bind("voice:actions", ({ actions }: { actions: ExpertAction[] }) => {
+        if (sessionIdRef.current === activeSessionId) {
+          onActions?.(actions);
+        }
+      });
+
+      channel.bind(
+        "voice:status",
+        ({ status, partialTranscript }: { status: VoiceSessionStatus; partialTranscript: string | null }) => {
+          if (sessionIdRef.current === activeSessionId) {
+            setStatus(status);
+            setPartialTranscript(partialTranscript);
+          }
+        },
+      );
+
+      stopPusherRef.current = () => {
+        channel.unbind_all();
+        client.unsubscribe(`voice-${activeSessionId}`);
+      };
+    },
+    [onMessages, onActions],
+  );
 
   const teardownRtc = useCallback(async () => {
     const localTrack = localAudioTrackRef.current;
@@ -154,9 +198,11 @@ export function useVoiceSession({
   const cleanupVoiceSession = useCallback(
     async ({ announceDisconnect }: { announceDisconnect: boolean }) => {
       stopPolling();
+      stopPusher();
       const activeSessionId = sessionIdRef.current;
       sessionIdRef.current = null;
       setSessionId(null);
+      setIsMuted(false);
       setPartialTranscript(null);
 
       if (announceDisconnect && statusRef.current !== "disabled") {
@@ -184,7 +230,7 @@ export function useVoiceSession({
         }
       }
     },
-    [stopPolling, teardownRtc],
+    [stopPolling, stopPusher, teardownRtc],
   );
 
   const getAgoraModule = useCallback(async () => {
@@ -384,7 +430,11 @@ export function useVoiceSession({
       }
 
       setStatus("listening");
-      void pollSession(nextSessionId);
+      if (process.env.NEXT_PUBLIC_PUSHER_KEY) {
+        void startPusher(nextSessionId);
+      } else {
+        void pollSession(nextSessionId);
+      }
     } catch (err) {
       if (nextSessionId) {
         sessionIdRef.current = nextSessionId;
@@ -406,9 +456,18 @@ export function useVoiceSession({
     getAgoraModule,
     inventionId,
     pollSession,
+    startPusher,
     status,
     teardownRtc,
   ]);
+
+  const toggleMute = useCallback(async () => {
+    const localTrack = localAudioTrackRef.current;
+    if (!localTrack) return;
+    const next = !isMuted;
+    await localTrack.setMuted(next);
+    setIsMuted(next);
+  }, [isMuted]);
 
   const toggleConnection = useCallback(async () => {
     if (sessionIdRef.current) {
@@ -429,6 +488,7 @@ export function useVoiceSession({
     return () => {
       destroyedRef.current = true;
       stopPolling();
+      stopPusher();
       const client = clientRef.current;
       const localTrack = localAudioTrackRef.current;
 
@@ -451,7 +511,7 @@ export function useVoiceSession({
         });
       }
     };
-  }, [stopPolling]);
+  }, [stopPolling, stopPusher]);
 
   useEffect(() => {
     if (!sessionIdRef.current) {
@@ -473,11 +533,13 @@ export function useVoiceSession({
 
   return {
     error,
+    isMuted,
     isConnected: Boolean(sessionId),
     partialTranscript,
     sessionId,
     status,
     toggleConnection,
+    toggleMute,
     disconnectVoice,
   };
 }
