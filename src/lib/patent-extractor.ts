@@ -381,10 +381,12 @@ function fallbackHeuristic(pageText: string): VisionFigureAnalysis {
 
   return {
     isFigurePage,
+    isTextOnlyPage: !isFigurePage,
     labels,
     description: isFigurePage
       ? "Patent figure page detected via FIG labels."
       : "Not identified as a figure page by fallback heuristic.",
+    figureRegions: [],
     components: snippet
       ? [
           {
@@ -504,7 +506,10 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
       const analysisSource: "vision" | "heuristic" = visionResult.analysis ? "vision" : "heuristic";
       const failureReason = analysisSource === "heuristic" ? visionResult.error : null;
 
-      if (!analysis.isFigurePage) {
+      if (!analysis.isFigurePage || analysis.isTextOnlyPage) {
+        if (analysis.isTextOnlyPage && analysisSource === "vision") {
+          warnings.push(`Skipped text-only page ${pageNumber} based on vision analysis.`);
+        }
         continue;
       }
 
@@ -513,7 +518,10 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
       const filename = `page-${pageNumber}-${safeLabel || `fig-p${pageNumber}`}.png`;
       const fileAbsolutePath = path.join(outputDirectoryAbsolute, filename);
 
-      await writeFile(fileAbsolutePath, imageBuffer);
+      const cropRegion = pickBestRegion(analysis.figureRegions);
+      const imageToWrite = cropRegion ? await cropImageByRegion(imageBuffer, cropRegion) : imageBuffer;
+
+      await writeFile(fileAbsolutePath, imageToWrite);
 
       figures.push({
         id: `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
@@ -523,6 +531,7 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
         description: analysis.description.trim() || "Patent figure page",
         analysisSource,
         failureReason,
+        cropRegion,
         components: dedupeComponents(analysis.components),
         pageTextSnippet: pageText.slice(0, 500),
       });

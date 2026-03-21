@@ -19,6 +19,14 @@ type ExtractedFigure = {
   description: string;
   analysisSource: "vision" | "heuristic";
   failureReason: string | null;
+  cropRegion: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    label?: string | null;
+    confidence?: number;
+  } | null;
   components: ExtractedComponent[];
   pageTextSnippet: string;
 };
@@ -204,6 +212,11 @@ export default function PatentExtractPage() {
                       {figure.analysisSource}
                     </span>
                     {figure.failureReason ? <span className="text-amber-200">{figure.failureReason}</span> : null}
+                    {figure.cropRegion ? (
+                      <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                        cropped
+                      </span>
+                    ) : null}
                   </div>
 
                   <div>

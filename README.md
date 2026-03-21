@@ -57,6 +57,7 @@ npm run test:watch # vitest in watch mode
 - **3D models / exploded view**: React Three Fiber + drei + three
 - **UI**: Tailwind CSS
 - **AI**: OpenRouter (server route at `src/app/api/chat/route.ts`)
+- **Patent PDF extraction (POC)**: `pdfjs-dist` + `canvas` + OpenRouter vision (`src/app/api/patent/extract/route.ts`)
 
 ## Project structure
 
@@ -64,7 +65,63 @@ npm run test:watch # vitest in watch mode
 - `src/app/invention/[id]/page.tsx`: invention detail + 3D viewer + AI chat
 - `src/app/api/search/route.ts`: search endpoint (filters inventions)
 - `src/app/api/chat/route.ts`: AI chat endpoint (returns plain text)
+- `src/app/api/patent/extract/route.ts`: patent PDF upload + figure/text extraction endpoint
 - `src/data/*`: invention dataset, categories, 3D component definitions
+
+## Patent PDF Extraction (POC)
+
+This project includes a POC endpoint to extract patent figure pages and context from uploaded PDFs.
+
+### Endpoint
+
+- `POST /api/patent/extract`
+- Content type: `multipart/form-data`
+- Fields:
+  - `file` (required): patent PDF file
+  - `patentId` (optional): custom ID used for output folder naming
+
+### Response
+
+Returns JSON with extracted figures and output paths:
+
+- `patentId`
+- `outputDirectory`
+- `manifestPath`
+- `textPath`
+- `totalPages`
+- `processedPages`
+- `figureCount`
+- `warnings[]`
+- `figures[]` (label, page number, description, components, image filename)
+
+### Output Files
+
+The API writes extracted artifacts to `public/patents/{patentId}/`:
+
+- `manifest.json`
+- `full-text.txt`
+- `page-<n>-fig-<label>.png` figure images
+
+### Example curl
+
+```bash
+curl -X POST http://localhost:3000/api/patent/extract \
+  -F "file=@docs/sample-patent.pdf" \
+  -F "patentId=us-sample"
+```
+
+### Behavior and fallback
+
+- If `OPENROUTER_API_KEY` is configured, page images are analyzed by a vision-capable model to identify figure pages and infer component names/reference numbers.
+- Without API key, extraction still runs with heuristics (e.g., FIG label detection), but figure classification and component naming will be lower fidelity.
+- Each extracted figure includes `analysisSource` (`vision` or `heuristic`) and `failureReason` (when falling back).
+
+### Limits and deployment notes
+
+- Current endpoint enforces a `50MB` PDF size cap.
+- Page processing defaults to first `60` pages (set via `PATENT_EXTRACT_MAX_PAGES`).
+- This route requires Node.js runtime (`runtime = "nodejs"`).
+- Writing to `public/` is suitable for local/dev POC. Serverless production deployments usually require object storage (S3/Vercel Blob/etc.) because local filesystem writes are ephemeral/read-only.
 
 ## Notes
 
