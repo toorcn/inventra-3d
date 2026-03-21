@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { extractLatestUserMessage } from "@/lib/agora";
 import { processVoiceWebhookTurnStreaming } from "@/lib/chat-service";
-import { getVoiceSession, updateVoiceSessionLastAgoraText } from "@/lib/voice-session-store";
+import { updateVoiceSessionLastAgoraText, getVoiceSession } from "@/lib/voice-session-store";
+import { verifyVoiceWebhookToken } from "@/lib/voice-webhook-token";
 import type { ChatMessage, VoiceAgentWebhookRequest } from "@/types";
 
 export const runtime = "nodejs";
@@ -20,16 +21,23 @@ function readBearerToken(request: Request): string | null {
 export async function POST(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url);
-    const sessionId = url.searchParams.get("sessionId")?.trim();
+    const rawToken = url.searchParams.get("t")?.trim();
 
-    if (!sessionId) {
-      return Response.json({ error: "Missing sessionId" }, { status: 400 });
+    if (!rawToken) {
+      return Response.json({ error: "Missing token" }, { status: 400 });
     }
 
-    const session = getVoiceSession(sessionId);
-    const token = readBearerToken(request);
+    let tokenPayload: Awaited<ReturnType<typeof verifyVoiceWebhookToken>>;
+    try {
+      tokenPayload = verifyVoiceWebhookToken(rawToken);
+    } catch {
+      return Response.json({ error: "Unauthorized voice webhook request" }, { status: 401 });
+    }
 
-    if (!token || token !== session.llmApiKey) {
+    const { sessionId, inventionId, componentId, llmApiKey } = tokenPayload;
+
+    const incomingKey = readBearerToken(request);
+    if (!incomingKey || incomingKey !== llmApiKey) {
       return Response.json({ error: "Unauthorized voice webhook request" }, { status: 401 });
     }
 
@@ -40,20 +48,18 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "Missing user content" }, { status: 400 });
     }
 
-    // Agora accumulates all user utterances into one growing string each turn.
-    // Diff against the last full Agora text (not the extracted chunk) to isolate
-    // only the newly-spoken portion.
-    const prevAgoraText = session.lastAgoraAccumulatedText ?? "";
-    const userText =
-      prevAgoraText && fullUserText.startsWith(prevAgoraText)
-        ? fullUserText.slice(prevAgoraText.length).trim()
-        : fullUserText;
-
-    // Store the full accumulated text now so the next turn can diff against it.
-    updateVoiceSessionLastAgoraText(sessionId, fullUserText);
-
-    if (!userText) {
-      return Response.json({ error: "Missing user content" }, { status: 400 });
+    // Best-effort deduplication using the in-memory store (works when the same
+    // serverless instance is reused; silently skipped otherwise).
+    let userText = fullUserText;
+    try {
+      const session = getVoiceSession(sessionId);
+      const prevAgoraText = session.lastAgoraAccumulatedText ?? "";
+      if (prevAgoraText && fullUserText.startsWith(prevAgoraText)) {
+        userText = fullUserText.slice(prevAgoraText.length).trim() || fullUserText;
+      }
+      updateVoiceSessionLastAgoraText(sessionId, fullUserText);
+    } catch {
+      // Session not in this instance's memory — use the full text as-is.
     }
 
     const requestMessages: ChatMessage[] = [
@@ -66,9 +72,15 @@ export async function POST(request: Request): Promise<Response> {
       },
     ];
 
+    // Agora's full conversation history (minus system messages) for LLM context.
+    const agoraMessages = body.messages.filter((m) => m.role !== "system");
+
     const stream = await processVoiceWebhookTurnStreaming({
       sessionId,
+      inventionId,
+      componentId,
       requestMessages,
+      agoraMessages,
     });
 
     return new Response(stream, {

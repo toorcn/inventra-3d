@@ -173,53 +173,50 @@ export async function processChatTurn({
 
 type ProcessVoiceWebhookInput = {
   sessionId: string;
+  inventionId: string;
+  componentId?: string;
   requestMessages: ChatMessage[];
+  // Full conversation history from Agora's webhook body (system messages excluded).
+  // Used directly for LLM context so the webhook is stateless w.r.t. the session store.
+  agoraMessages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
 };
-
-export async function processVoiceWebhookTurn({
-  sessionId,
-  requestMessages,
-}: ProcessVoiceWebhookInput): Promise<ChatResponse> {
-  const session = getVoiceSession(sessionId);
-
-  return processChatTurn({
-    inventionId: session.inventionId,
-    componentId: session.componentId,
-    requestMessages,
-    delivery: "spoken",
-    sessionId,
-  });
-}
 
 export async function processVoiceWebhookTurnStreaming({
   sessionId,
+  inventionId,
+  componentId,
   requestMessages,
+  agoraMessages,
 }: ProcessVoiceWebhookInput): Promise<ReadableStream<Uint8Array>> {
-  const session = getVoiceSession(sessionId);
-  const invention = getInventionById(session.inventionId);
+  const invention = getInventionById(inventionId);
 
   if (!invention) {
     throw new Error("Invention not found");
   }
 
   const userMessage = requestMessages[0];
-  appendVoiceSessionMessage(sessionId, userMessage);
-  setVoiceSessionThinking(sessionId, userMessage.content);
+
+  // Best-effort: append to in-memory store and push Pusher events.
+  // These may fail if the session isn't in this serverless instance's memory.
+  try {
+    appendVoiceSessionMessage(sessionId, userMessage);
+    setVoiceSessionThinking(sessionId, userMessage.content);
+  } catch {
+    // Session not in this instance — Pusher still delivers events below.
+  }
   publishVoiceEvents(sessionId, [userMessage], [], "thinking", userMessage.content);
 
   const component =
-    session.componentId && session.componentId.trim().length > 0
-      ? getComponentById(session.componentId)
-      : undefined;
+    componentId && componentId.trim().length > 0 ? getComponentById(componentId) : undefined;
   const systemPrompt = buildToolInstructions(invention, component);
-  const conversationMessages = getVoiceSession(sessionId).messages;
-  const messagesForLlm = toOpenRouterMessages(conversationMessages);
+
+  // Use Agora's conversation history directly — it tracks the full turn history
+  // across all webhook calls, making this path stateless w.r.t. the session store.
+  const messagesForLlm = agoraMessages.filter((m) => m.role !== "system");
 
   // Kick off both calls in parallel:
   // - structured agent → extracts 3D viewer actions
   // - prose stream     → generates the spoken response for TTS
-  // This way the prose model never has to disclaim tool use; it just describes
-  // what is happening naturally, and actions arrive as soon as they're ready.
   const agentResultPromise = runExpertAgent(invention, messagesForLlm, component);
 
   const openRouterStream = await chatCompletionStream(
@@ -260,8 +257,14 @@ export async function processVoiceWebhookTurnStreaming({
         delivery: "spoken",
         timestamp: Date.now(),
       };
-      appendVoiceSessionMessage(sessionId, assistantMessage);
-      setVoiceSessionSpeaking(sessionId, fullContent);
+
+      // Best-effort store update.
+      try {
+        appendVoiceSessionMessage(sessionId, assistantMessage);
+        setVoiceSessionSpeaking(sessionId, fullContent);
+      } catch {
+        // Session not in this instance's memory.
+      }
       publishVoiceEvents(sessionId, [assistantMessage], [], "speaking", null);
 
       // Emit viewer actions from the already-in-flight structured agent call.
@@ -270,16 +273,10 @@ export async function processVoiceWebhookTurnStreaming({
           if (actions.length > 0) {
             try {
               enqueueVoiceSessionActions(sessionId, actions);
-              publishVoiceEvents(
-                sessionId,
-                [],
-                actions,
-                getVoiceSession(sessionId).status,
-                null,
-              );
             } catch {
-              // Session may have expired by the time actions resolve.
+              // Best-effort.
             }
+            publishVoiceEvents(sessionId, [], actions, "speaking", null);
           }
         })
         .catch(() => {});

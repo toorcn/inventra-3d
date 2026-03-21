@@ -1,4 +1,5 @@
 import { buildInventionContext } from "@/lib/invention-context";
+import { signVoiceWebhookToken } from "@/lib/voice-webhook-token";
 import type { Invention, InventionComponent, VoiceAgentWebhookRequest } from "@/types";
 import { RtcRole, RtcTokenBuilder } from "agora-access-token";
 import type { VoiceSessionRecord } from "./voice-session-store";
@@ -130,9 +131,20 @@ function getAgoraProjectBaseUrl(config: AgoraVoiceConfig): string {
   return `${AGORA_CONVO_AI_BASE_URL}/${config.appId}`;
 }
 
-function getCustomLlmUrl(config: AgoraVoiceConfig, session: VoiceSessionRecord): string {
+function getCustomLlmUrl(
+  config: AgoraVoiceConfig,
+  session: VoiceSessionRecord,
+  invention: Invention,
+  component?: InventionComponent,
+): string {
+  const token = signVoiceWebhookToken({
+    sessionId: session.sessionId,
+    inventionId: invention.id,
+    componentId: component?.id,
+    llmApiKey: session.llmApiKey,
+  });
   const url = new URL("/api/voice/llm", config.appUrl);
-  url.searchParams.set("sessionId", session.sessionId);
+  url.searchParams.set("t", token);
   return url.toString();
 }
 
@@ -158,7 +170,7 @@ export function buildAgoraAgentJoinPayload(
         task: "conversation",
       },
       llm: {
-        url: getCustomLlmUrl(config, session),
+        url: getCustomLlmUrl(config, session, invention, component),
         api_key: session.llmApiKey,
         system_messages: [
           {
