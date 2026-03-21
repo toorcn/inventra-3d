@@ -92,7 +92,7 @@ export async function generatePatentComponentImageVariant(
       component.evidence.map((item) => item.figureId);
     const figureFallbackImages = workspace.figures
       .filter((figure) => supportingFigureIds.includes(figure.id))
-      .slice(0, component.evidenceMode === "contextual_inferred" ? 2 : 1)
+      .slice(0, 1)
       .map((figure) => ({
         imagePath: figure.imagePath,
         imageFilename: figure.filename,

@@ -189,7 +189,12 @@ export async function POST(request: Request): Promise<Response> {
           kind: c.kind,
         })),
         patentText: currentWorkspace.extractedText ?? "",
-        assemblyGraph: currentWorkspace.assemblyGraph ?? null,
+        assemblyGraph: heroComponentId
+          ? {
+              heroRef: currentWorkspace.componentLibrary.find(c => c.id === heroComponentId)?.canonicalRefNumber ?? heroComponentId,
+              children: targetComponents.filter(c => c.id !== heroComponentId).map(c => c.canonicalRefNumber ?? c.id),
+            }
+          : null,
       };
 
       let inferenceResult: { relationships: Array<{ ref: string; relation: 'between' | 'through' | 'attached_to' | 'inside' | 'adjacent' | 'surrounds'; targets: string[]; axis?: 'x' | 'y' | 'z'; side?: 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back'; offset?: number }>; textDimensions: Array<{ ref: string; fractionOfHero: number }> };

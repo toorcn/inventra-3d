@@ -320,7 +320,8 @@ export function buildPatentAssemblyContract(input: {
     // Use inference engine for non-hero components
     const posResult = resolveComponentPosition({
       componentId: component.id,
-      anchorRegions: component.anchorRegions ?? [],
+      anchorRegions: (component.anchorRegions ?? [])
+        .filter((a): a is typeof a & { region: NonNullable<typeof a.region> } => a.region !== null),
       heroFigureIds: workspace.figures.filter(f => f.role === "full_product_view").map(f => f.id),
       relationships: inferenceData.relationships.filter(r => r.ref === component.canonicalRefNumber),
       resolvedPositions: inferenceData.resolvedPositions,
