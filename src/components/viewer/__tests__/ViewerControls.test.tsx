@@ -19,10 +19,10 @@ describe("ViewerControls", () => {
       />,
     );
 
-    expect(screen.getAllByText("Camera blocked")).toHaveLength(2);
-    expect(screen.getByText(/Open palm rotates/i)).toBeTruthy();
-    expect(screen.getByText(/Camera access was blocked/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Disable Gestures/i })).toBeTruthy();
+    expect(screen.getByText("Gesture Control")).toBeTruthy();
+    expect(screen.getByText("Camera blocked")).toBeTruthy();
+    expect(screen.getByText(/Link:.*CAMERA BLOCKED/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Enable Gestures/i })).toBeTruthy();
   });
 
   it("renders unsupported status without showing the preview panel when gestures are off", () => {
@@ -40,7 +40,7 @@ describe("ViewerControls", () => {
       />,
     );
 
-    expect(screen.getByText("Unsupported")).toBeTruthy();
+    expect(screen.getByText(/Link:.*UNSUPPORTED/i)).toBeTruthy();
     expect(screen.queryByText("Gesture Control")).toBeNull();
     expect(screen.getByRole("button", { name: /Enable Gestures/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Assemble/i })).toBeTruthy();
@@ -94,7 +94,7 @@ describe("ViewerControls", () => {
       />,
     );
 
-    expect(screen.getByText("Open Palm 93%")).toBeTruthy();
-    expect(screen.getByText("Stable")).toBeTruthy();
+    expect(screen.getByText("OPEN PALM")).toBeTruthy();
+    expect(screen.getByText("LOCK - STABLE")).toBeTruthy();
   });
 });

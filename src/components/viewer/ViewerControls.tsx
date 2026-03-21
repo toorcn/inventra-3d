@@ -89,7 +89,7 @@ export function ViewerControls({
                 autoPlay
                 muted
                 playsInline
-                className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-60 grayscale"
+                className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-90"
               />
               <div className="pointer-events-none absolute inset-0 scale-x-[-1]">
                 {gestureDebugFrame?.bounds ? (
@@ -161,7 +161,7 @@ export function ViewerControls({
           }`}
         >
           <Hand className={`size-3.5 ${gestureEnabled ? 'text-[var(--accent-gold)]' : ''}`} />
-          Neural Link
+          Enable Gestures
         </button>
         
         <div className="h-6 w-px bg-white/10" />
