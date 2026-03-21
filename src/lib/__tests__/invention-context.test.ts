@@ -4,16 +4,17 @@ import { getComponentById } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
 
 describe("buildInventionContext", () => {
-  it("includes invention title in context", () => {
-    const invention = getInventionById("iphone");
+  it("includes invention title and persona in context", () => {
+    const invention = getInventionById("telephone");
     expect(invention).toBeDefined();
     const context = buildInventionContext(invention!);
     expect(context).toContain(invention!.title);
+    expect(context).toContain(invention!.avatarPersona);
   });
 
-  it("includes component info when provided", () => {
-    const invention = getInventionById("iphone");
-    const component = getComponentById("iphone-camera");
+  it("includes component name and description when a component is selected", () => {
+    const invention = getInventionById("telephone");
+    const component = getComponentById("telephone-diaphragm");
     expect(invention).toBeDefined();
     expect(component).toBeDefined();
     const context = buildInventionContext(invention!, component!);
