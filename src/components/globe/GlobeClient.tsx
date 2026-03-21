@@ -82,6 +82,7 @@ export default function GlobeClient({
         onPolygonHover={(feature: object | null) =>
           setHoverCountry((feature as GeoFeature | null) ?? null)
         }
+        polygonsTransitionDuration={0}
         onPolygonClick={(feature: object) => {
           const code = (feature as GeoFeature).properties.ISO_A2;
           if (code) onCountryClick(code);
