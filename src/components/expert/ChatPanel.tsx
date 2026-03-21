@@ -14,9 +14,11 @@ interface ChatPanelProps {
   suggestedQuestions: string[];
   isVoiceActive: boolean;
   isVoiceConnecting: boolean;
+  isVoiceMuted: boolean;
   voiceError: string | null;
   onSendMessage: (content: string, options?: { delivery?: TranscriptDelivery }) => void;
   onStartVoice: () => void;
+  onToggleMute: () => void;
   onStopVoice: () => void;
 }
 
@@ -27,9 +29,11 @@ export function ChatPanel({
   suggestedQuestions,
   isVoiceActive,
   isVoiceConnecting,
+  isVoiceMuted,
   voiceError,
   onSendMessage,
   onStartVoice,
+  onToggleMute,
   onStopVoice,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -54,7 +58,9 @@ export function ChatPanel({
           <h3 className="text-sm font-semibold text-white">AI Expert</h3>
           <p className="text-xs text-[var(--text-secondary)]">
             {isVoiceActive
-              ? "Voice room live"
+              ? isVoiceMuted
+                ? "Voice room live, mic muted"
+                : "Voice room live"
               : isVoiceConnecting
                 ? "Joining Agora voice..."
                 : isSpeaking
@@ -62,27 +68,39 @@ export function ChatPanel({
                   : "Ask me anything"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (isVoiceActive || isVoiceConnecting) {
-              onStopVoice();
-              return;
-            }
-            onStartVoice();
-          }}
-          disabled={isVoiceConnecting}
-          className="ml-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
-        >
-          {isVoiceConnecting ? (
-            <LoaderCircle className="size-4 animate-spin" />
-          ) : isVoiceActive ? (
-            <MicOff className="size-4" />
-          ) : (
-            <Mic className="size-4" />
+        <div className="ml-auto flex items-center gap-2">
+          {isVoiceActive && (
+            <button
+              type="button"
+              onClick={onToggleMute}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/10"
+            >
+              {isVoiceMuted ? <Mic className="size-4" /> : <MicOff className="size-4" />}
+              {isVoiceMuted ? "Unmute" : "Mute"}
+            </button>
           )}
-          {isVoiceActive ? "Stop voice" : "Start voice"}
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (isVoiceActive || isVoiceConnecting) {
+                onStopVoice();
+                return;
+              }
+              onStartVoice();
+            }}
+            disabled={isVoiceConnecting}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+          >
+            {isVoiceConnecting ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : isVoiceActive ? (
+              <MicOff className="size-4" />
+            ) : (
+              <Mic className="size-4" />
+            )}
+            {isVoiceActive ? "Stop voice" : "Start voice"}
+          </button>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">

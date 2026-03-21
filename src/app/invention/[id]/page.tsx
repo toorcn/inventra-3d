@@ -256,8 +256,12 @@ export default function InventionDetailPage() {
                         : "live"
                   }
                   isTranscriptOpen={isTranscriptOpen}
+                  isMuted={voice.isMuted}
                   voiceError={voice.error}
                   onToggleTranscript={handleToggleTranscript}
+                  onToggleMute={() => {
+                    void voice.toggleMute();
+                  }}
                   onStopVoice={handleStopVoice}
                 />
               )}
@@ -335,18 +339,22 @@ export default function InventionDetailPage() {
 
         {shouldShowTranscriptRail && (
           <aside className="h-[40vh] border-t border-white/5 bg-black/20 lg:h-full lg:w-[420px] lg:border-l lg:border-t-0">
-            <ChatPanel
-              messages={messages}
-              isLoading={isLoading}
-              isSpeaking={isSpeaking}
-              suggestedQuestions={suggestedQuestions}
-              isVoiceActive={voice.status === "live"}
-              isVoiceConnecting={voice.status === "connecting"}
-              voiceError={voice.error}
-              onSendMessage={sendMessage}
-              onStartVoice={handleStartVoice}
-              onStopVoice={handleStopVoice}
-            />
+              <ChatPanel
+                messages={messages}
+                isLoading={isLoading}
+                isSpeaking={isSpeaking}
+                suggestedQuestions={suggestedQuestions}
+                isVoiceActive={voice.status === "live"}
+                isVoiceConnecting={voice.status === "connecting"}
+                isVoiceMuted={voice.isMuted}
+                voiceError={voice.error}
+                onSendMessage={sendMessage}
+                onStartVoice={handleStartVoice}
+                onToggleMute={() => {
+                  void voice.toggleMute();
+                }}
+                onStopVoice={handleStopVoice}
+              />
           </aside>
         )}
       </section>

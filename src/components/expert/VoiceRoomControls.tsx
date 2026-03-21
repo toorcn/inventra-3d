@@ -1,22 +1,26 @@
 "use client";
 
-import { Mic, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { Mic, MicOff, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 
 type VoiceRoomStatus = "connecting" | "live" | "error";
 
 interface VoiceRoomControlsProps {
   status: VoiceRoomStatus;
   isTranscriptOpen: boolean;
+  isMuted: boolean;
   voiceError: string | null;
   onToggleTranscript: () => void;
+  onToggleMute: () => void;
   onStopVoice: () => void;
 }
 
 export function VoiceRoomControls({
   status,
   isTranscriptOpen,
+  isMuted,
   voiceError,
   onToggleTranscript,
+  onToggleMute,
   onStopVoice,
 }: VoiceRoomControlsProps) {
   const title =
@@ -54,6 +58,16 @@ export function VoiceRoomControls({
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {status === "live" && (
+          <button
+            type="button"
+            onClick={onToggleMute}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
+          >
+            {isMuted ? <Mic className="size-4" /> : <MicOff className="size-4" />}
+            {isMuted ? "Unmute mic" : "Mute mic"}
+          </button>
+        )}
         <button
           type="button"
           onClick={onToggleTranscript}

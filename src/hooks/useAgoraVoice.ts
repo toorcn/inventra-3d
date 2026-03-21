@@ -33,6 +33,7 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
 
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<VoiceStatus>("idle");
+  const [isMuted, setIsMuted] = useState(false);
 
   const cleanupRtc = useCallback(async () => {
     const client = clientRef.current;
@@ -48,7 +49,7 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
       }
       remoteUsersRef.current.clear();
       try {
-        await client.leave();
+      await client.leave();
       } catch {
         // Ignore cleanup errors when the client is already torn down.
       }
@@ -56,6 +57,17 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
 
     clientRef.current = null;
   }, []);
+
+  const toggleMute = useCallback(async () => {
+    const localTrack = localTrackRef.current;
+    if (!localTrack || status !== "live") {
+      return;
+    }
+
+    const nextMuted = !isMuted;
+    await localTrack.setMuted(nextMuted);
+    setIsMuted(nextMuted);
+  }, [isMuted, status]);
 
   const stopVoice = useCallback(async () => {
     const session = sessionRef.current;
@@ -73,6 +85,7 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
       await cleanupRtc();
       setStatus("idle");
       setError(null);
+      setIsMuted(false);
     }
   }, [cleanupRtc]);
 
@@ -126,6 +139,7 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
 
       clientRef.current = client;
       localTrackRef.current = localTrack;
+      setIsMuted(false);
 
       const startResponse = await fetch("/api/agora/session", {
         method: "PUT",
@@ -154,6 +168,7 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
       sessionRef.current = null;
       setStatus("error");
       setError(err instanceof Error ? err.message : "Agora voice failed to start.");
+      setIsMuted(false);
     }
   }, [cleanupRtc, componentId, inventionId, status]);
 
@@ -161,8 +176,10 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
     error,
     isActive: status === "live",
     isConnecting: status === "connecting",
+    isMuted,
     startVoice,
     status,
+    toggleMute,
     stopVoice,
   };
 }
