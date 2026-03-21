@@ -1,21 +1,27 @@
 "use client";
 
-import Globe from "@/components/globe/Globe";
+import CesiumGlobe from "@/components/globe/CesiumGlobe";
+import TemporosSlider from "@/components/globe/TemporosSlider";
 import { DemoMode } from "@/components/demo/DemoMode";
 import { SidePanel } from "@/components/discovery/SidePanel";
-import { categories } from "@/data/categories";
-import { useGlobeCamera } from "@/hooks/useGlobeCamera";
-import { useGlobeInteraction } from "@/hooks/useGlobeInteraction";
 import { useInventions } from "@/hooks/useInventions";
+import type { Invention } from "@/types";
 import { Play, RotateCcw } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 export default function Home() {
   const inventionState = useInventions();
-  const globeRef = useRef(undefined);
-  const camera = useGlobeCamera(globeRef);
-  const interaction = useGlobeInteraction(inventionState, camera);
   const [demoRunning, setDemoRunning] = useState(false);
+  const [temporosYear, setTemporosYear] = useState(2025);
+
+  const handleInventionSelect = (invention: Invention) => {
+    inventionState.selectInvention(invention.id);
+  };
+
+  const handleReset = () => {
+    inventionState.resetFilters();
+    setTemporosYear(2025);
+  };
 
   return (
     <main className="relative h-screen w-screen overflow-hidden">
@@ -29,7 +35,7 @@ export default function Home() {
             Start Demo
           </button>
           <button
-            onClick={interaction.handleReset}
+            onClick={handleReset}
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[var(--bg-panel)] px-3 py-2 text-sm text-[var(--text-secondary)] backdrop-blur-xl transition-colors hover:text-white"
           >
             <RotateCcw className="size-4" />
@@ -41,15 +47,12 @@ export default function Home() {
       <DemoMode running={demoRunning} onStop={() => setDemoRunning(false)} />
 
       <div className="absolute inset-0 pr-[26rem]">
-        <Globe
-          inventions={inventionState.filtered}
-          categories={categories}
-          activeCategories={inventionState.activeCategories}
-          selectedInventionId={inventionState.selectedInvention?.id ?? null}
-          onCountryClick={interaction.handleCountryClick}
-          onInventionClick={interaction.handleInventionClick}
-          globeRef={globeRef}
+        <CesiumGlobe
+          onInventionSelect={handleInventionSelect}
+          selectedInventionId={inventionState.selectedInvention?.id}
+          temporosYear={temporosYear}
         />
+        <TemporosSlider year={temporosYear} onYearChange={setTemporosYear} />
       </div>
 
       <div className="pointer-events-none absolute right-4 top-4 z-20 h-[calc(100vh-2rem)]">
@@ -58,11 +61,11 @@ export default function Home() {
           activeCategories={inventionState.activeCategories}
           onToggleCategory={inventionState.toggleCategory}
           selectedInvention={inventionState.selectedInvention}
-          onSelectInvention={interaction.handleCardClick}
+          onSelectInvention={(id) => inventionState.selectInvention(id)}
           searchValue={inventionState.searchQuery}
           onSearchChange={inventionState.setSearchQuery}
-          onSearchSubmit={interaction.handleSearch}
-          isSearching={interaction.isSearching}
+          onSearchSubmit={(q) => inventionState.setSearchQuery(q)}
+          isSearching={false}
         />
       </div>
       <div className="absolute bottom-4 left-4 z-20 rounded-xl border border-white/10 bg-[var(--bg-panel)] px-3 py-2 text-xs text-[var(--text-secondary)] backdrop-blur-xl">
