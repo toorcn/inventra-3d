@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.82",
     "@react-spring/three": "^10.0.3",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
@@ -17,6 +18,7 @@
     "d3-scale-chromatic": "^3.1.0",
     "lucide-react": "^0.577.0",
     "next": "15.5.14",
+    "pdfjs-dist": "^5.5.207",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-globe.gl": "^2.37.0",
