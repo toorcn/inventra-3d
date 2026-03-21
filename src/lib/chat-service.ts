@@ -214,7 +214,13 @@ export async function processVoiceWebhookTurnStreaming({
   const messagesForLlm = toOpenRouterMessages(conversationMessages);
 
   const openRouterStream = await chatCompletionStream(
-    [{ role: "system", content: systemPrompt }, ...messagesForLlm],
+    [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\nIMPORTANT: Reply with plain prose only. Do NOT include any tool calls, tool syntax, component IDs, or action references in your response. Viewer actions are handled separately.`,
+      },
+      ...messagesForLlm,
+    ],
     { max_tokens: 700, temperature: 0.2 },
   );
 
