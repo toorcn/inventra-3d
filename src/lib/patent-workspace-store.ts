@@ -102,7 +102,7 @@ function normalizeWorkspaceManifest(payload: PatentWorkspaceManifest): PatentWor
   return {
     ...payload,
     capabilities: payload.capabilities ?? {
-      imageGeneration: Boolean(process.env.FAL_KEY ?? process.env.FAL_API_KEY),
+      imageGeneration: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
       threeDGeneration: Boolean(process.env.FAL_KEY ?? process.env.FAL_API_KEY),
     },
     paths: {

@@ -122,7 +122,7 @@ describe("getImageExtensionForMimeType", () => {
 
 describe("isRateLimitErrorMessage", () => {
   it("detects typical quota and rate limit failures", () => {
-    expect(isRateLimitErrorMessage("fal.ai Nano Banana Pro enhancement failed (429): quota exceeded")).toBe(true);
+    expect(isRateLimitErrorMessage("OpenRouter Nano Banana enhancement failed (429): quota exceeded")).toBe(true);
     expect(isRateLimitErrorMessage("Rate limit reached")).toBe(true);
     expect(isRateLimitErrorMessage("unexpected server error")).toBe(false);
   });

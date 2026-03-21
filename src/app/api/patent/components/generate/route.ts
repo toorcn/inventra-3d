@@ -39,6 +39,18 @@ function getComponentOrThrow(workspace: { componentLibrary: PatentComponentRecor
   return component;
 }
 
+function isFeaturedGeneratableComponent(workspace: PatentWorkspaceManifest, componentId: string): boolean {
+  if (workspace.featured.heroComponentId === componentId) {
+    return true;
+  }
+
+  return workspace.featured.subassemblyComponentIds.includes(componentId);
+}
+
+function canGenerateComponent(workspace: PatentWorkspaceManifest, component: PatentComponentRecord): boolean {
+  return component.reviewStatus === "approved" || isFeaturedGeneratableComponent(workspace, component.id);
+}
+
 async function generateAsset(
   workspacePatentId: string,
   workspace: PatentWorkspaceManifest,
@@ -63,18 +75,34 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "Missing componentId" }, { status: 400 });
     }
 
-    const queuedWorkspace = updatePatentComponentImageGeneration(await readPatentWorkspaceManifest(patentId), componentId, variant, {
+    const workspace = await readPatentWorkspaceManifest(patentId);
+    const component = getComponentOrThrow(workspace, componentId);
+    if (!canGenerateComponent(workspace, component)) {
+      return Response.json(
+        {
+          error: "This component is still too ambiguous to generate directly. Approve it first or generate from the featured hero/subassembly set.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const queuedWorkspace = updatePatentComponentImageGeneration(workspace, componentId, variant, {
       status: "queued",
       error: null,
     });
     await writePatentWorkspaceManifest(queuedWorkspace);
 
-    const updatedWorkspace = await runInGenerationQueue(async () => {
+    void runInGenerationQueue(async () => {
       let workspace = await readPatentWorkspaceManifest(patentId);
       const currentComponent = getComponentOrThrow(workspace, componentId);
 
-      if (currentComponent.reviewStatus !== "approved") {
-        throw new Error("Only approved canonical components can be generated.");
+      if (!canGenerateComponent(workspace, currentComponent)) {
+        workspace = updatePatentComponentImageGeneration(workspace, componentId, variant, {
+          status: "failed",
+          error: "This component is still too ambiguous to generate directly.",
+        });
+        await writePatentWorkspaceManifest(workspace);
+        return workspace;
       }
 
       workspace = updatePatentComponentImageGeneration(workspace, componentId, variant, {
@@ -99,11 +127,17 @@ export async function POST(request: Request): Promise<Response> {
 
       await writePatentWorkspaceManifest(workspace);
       return workspace;
+    }).catch(async (error) => {
+      const workspace = updatePatentComponentImageGeneration(await readPatentWorkspaceManifest(patentId), componentId, variant, {
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown background generation error",
+      });
+      await writePatentWorkspaceManifest(workspace);
     });
 
     return Response.json(
       {
-        workspace: updatedWorkspace,
+        workspace: queuedWorkspace,
       },
       {
         status: 200,

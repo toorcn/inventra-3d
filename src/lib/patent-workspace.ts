@@ -890,37 +890,21 @@ function deriveAssemblyBucket(component: PatentComponentRecord): {
     };
   }
 
-  if (includesAnyKeyword(text, ["ball", "seat", "socket", "projection", "edge", "retention"])) {
+  // Generic fallback: bucket by ref number to keep each ref group separate.
+  const primaryRef = component.refNumbers[0];
+  if (primaryRef) {
     return {
-      key: "ball-retention",
-      name: "Ball retention geometry",
-      summary: "Parts that retain, guide, or seat the rolling ball at the tip.",
+      key: `ref-${primaryRef}`,
+      name: `${component.canonicalName} group`,
+      summary: `Components related to ref ${primaryRef}: ${component.summary}`,
       role: "core",
-    };
-  }
-
-  if (includesAnyKeyword(text, ["ink", "relay", "holding", "impregnation", "reservoir", "air hole", "groove"])) {
-    return {
-      key: "ink-feed",
-      name: "Ink feed / relay path",
-      summary: "Parts that store, wick, relay, or regulate ink and airflow through the tip.",
-      role: "core",
-    };
-  }
-
-  if (includesAnyKeyword(text, ["valve", "regulating", "actuator", "wall", "notch"])) {
-    return {
-      key: "valve-regulating",
-      name: "Valve or regulating mechanism",
-      summary: "Movable or regulating elements that influence ink flow or mechanical operation.",
-      role: "tooling_process",
     };
   }
 
   return {
-    key: "tip-body",
-    name: "Tip body / housing",
-    summary: "Primary structural parts that define the body and interface surfaces of the tip assembly.",
+    key: `component-${component.id.slice(-8)}`,
+    name: component.canonicalName || "Patent component group",
+    summary: component.summary || "Component inferred from patent figure context.",
     role: "core",
   };
 }
@@ -931,32 +915,30 @@ function deriveAssemblyMetadataFromComponents(components: PatentComponentRecord[
   summary: string;
   role: PatentAssemblyRole;
 } {
-  const bucketCounts = new Map<
-    string,
-    {
-      key: string;
-      name: string;
-      summary: string;
-      role: PatentAssemblyRole;
-      count: number;
-    }
-  >();
-
-  for (const component of components) {
-    const bucket = deriveAssemblyBucket(component);
-    const current = bucketCounts.get(bucket.key) ?? { ...bucket, count: 0 };
-    current.count += 1;
-    bucketCounts.set(bucket.key, current);
-  }
-
-  return (
-    [...bucketCounts.values()].sort((a, b) => b.count - a.count)[0] ?? {
+  if (components.length === 0) {
+    return {
       key: "grouped-assembly",
       name: "Grouped patent assembly",
       summary: "Reference-linked components grouped from shared patent figure evidence.",
       role: "core",
-    }
-  );
+    };
+  }
+
+  // Derive a name from the top-scoring representative component's canonical name,
+  // falling back to a ref-number list. This is patent-agnostic.
+  const sorted = [...components].sort((a, b) => scoreAssemblyRepresentative(b) - scoreAssemblyRepresentative(a));
+  const topName = sorted[0]?.canonicalName?.trim();
+  const refs = uniqueStrings(components.flatMap((c) => c.refNumbers)).slice(0, 4);
+  const refSuffix = refs.length > 0 ? ` (Ref ${refs.join(", ")})` : "";
+
+  const hasAuxiliary = components.some((c) => c.role === "auxiliary");
+  const role: PatentAssemblyRole = hasAuxiliary && components.every((c) => c.role === "auxiliary") ? "auxiliary" : "core";
+
+  const name = topName ? `${topName} group` : `Assembly${refSuffix}`;
+  const summary = `Components grouped by shared figure evidence: ${components.map((c) => c.canonicalName).slice(0, 4).join(", ")}.`;
+  const key = refs.length > 0 ? refs.sort().join("-") : name.toLowerCase().replace(/\s+/g, "-").slice(0, 40);
+
+  return { key, name, summary, role };
 }
 
 function scoreAssemblyRepresentative(component: PatentComponentRecord): number {
@@ -1023,14 +1005,26 @@ function buildAssemblies(
       continue;
     }
 
-    const groupKey = childRefNumbers.sort().join("|");
-    const current = figureGroups.get(groupKey) ?? {
+    // Key by figure so each distinct figure becomes its own subassembly candidate.
+    // We dedup fully-identical component sets afterwards.
+    const current = figureGroups.get(figureId) ?? {
       componentIds,
       groupedFigureIds: [],
     };
     current.componentIds = uniqueStrings([...current.componentIds, ...componentIds]);
     current.groupedFigureIds = uniqueStrings([...current.groupedFigureIds, figureId]);
-    figureGroups.set(groupKey, current);
+    figureGroups.set(figureId, current);
+  }
+
+  // Remove duplicate groups whose component sets are identical to an already-kept group.
+  const seenComponentKeys = new Set<string>();
+  for (const [figureId, bucket] of figureGroups.entries()) {
+    const key = [...bucket.componentIds].sort().join("|");
+    if (seenComponentKeys.has(key)) {
+      figureGroups.delete(figureId);
+    } else {
+      seenComponentKeys.add(key);
+    }
   }
 
   const fallbackBuckets = new Map<

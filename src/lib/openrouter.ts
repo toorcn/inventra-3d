@@ -10,7 +10,7 @@ type CompletionOptions = {
 };
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-001";
+const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
 
 function hasApiKey(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY?.trim());

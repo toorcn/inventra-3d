@@ -3,7 +3,7 @@ import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { hasOpenRouterApiKey } from "@/lib/openrouter";
 import { triageCropQuality, validateCropQuality } from "@/lib/patent-crop-validator";
-import { hasFalApiKey } from "@/lib/patent-image-enhancer";
+import { hasPatentImageEnhancementApiKey } from "@/lib/patent-image-enhancer";
 import {
   createPatentWorkspaceManifest,
   type CropValidation,
@@ -90,7 +90,7 @@ type PdfJsModule = {
 type Canvas2DContext = ReturnType<ReturnType<typeof createCanvas>["getContext"]>;
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const VISION_MODEL = "google/gemini-2.0-flash-001";
+const VISION_MODEL = "google/gemini-2.5-flash-lite";
 const FIGURE_LABEL_REGEX = /(?:fig(?:ure)?\.?\s*)(\d+[a-z]?)/gi;
 
 let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
@@ -611,15 +611,15 @@ function fallbackHeuristic(pageText: string): VisionFigureAnalysis {
     figureRegions: [],
     components: isFigurePage
       ? [
-          {
-            refNumber: null,
-            name: fallbackName,
-            summary: snippet || "Patent component inferred from figure context.",
-            functionDescription: "Functional role inferred from nearby patent text.",
-            kind: "subassembly",
-            confidence: 0.35,
-          },
-        ]
+        {
+          refNumber: null,
+          name: fallbackName,
+          summary: snippet || "Patent component inferred from figure context.",
+          functionDescription: "Functional role inferred from nearby patent text.",
+          kind: "subassembly",
+          confidence: 0.35,
+        },
+      ]
       : [],
     componentRegions: [],
   };
@@ -773,18 +773,18 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
       const detectionInputs =
         analysis.componentRegions.length > 0
           ? analysis.componentRegions.map((region) => ({
-              ...region,
-              region: normalizeRegion(region),
-            }))
+            ...region,
+            region: normalizeRegion(region),
+          }))
           : analysis.components.map((component) => ({
-              ...component,
-              label: null,
-              x: cropRegion?.x ?? 0,
-              y: cropRegion?.y ?? 0,
-              width: cropRegion?.width ?? 1,
-              height: cropRegion?.height ?? 1,
-              region: cropRegion,
-            }));
+            ...component,
+            label: null,
+            x: cropRegion?.x ?? 0,
+            y: cropRegion?.y ?? 0,
+            width: cropRegion?.width ?? 1,
+            height: cropRegion?.height ?? 1,
+            region: cropRegion,
+          }));
 
       const componentDetections: PatentFigureComponentDetection[] = [];
 
@@ -858,14 +858,14 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
         componentDetections.length > 0
           ? componentDetections
           : buildFallbackRegions(
-              `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
-              label,
-              filename,
-              figureImagePath,
-              analysis.components,
-              expandedFigureRegion,
-              figureQuality,
-            );
+            `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
+            label,
+            filename,
+            figureImagePath,
+            analysis.components,
+            expandedFigureRegion,
+            figureQuality,
+          );
 
       figures.push({
         id: `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
@@ -902,8 +902,8 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
     extractedText,
     warnings,
     capabilities: {
-      imageGeneration: hasFalApiKey(),
-      threeDGeneration: hasFalApiKey(),
+      imageGeneration: hasPatentImageEnhancementApiKey(),
+      threeDGeneration: false,
     },
     paths: diskPaths.publicPaths,
     figures,

@@ -1,3 +1,4 @@
+import { hasOpenRouterApiKey } from "@/lib/openrouter";
 import type {
   PatentAssetKind,
   PatentBuildableStatus,
@@ -44,25 +45,89 @@ type PatentComponentEnhancementResult = {
   model: string;
 };
 
-type FalImageOutput = {
+type OpenRouterImageOutput = {
+  image_url?: string;
   url?: string;
-  content_type?: string;
-  file_name?: string;
+  type?: string;
 };
 
-type FalGenerateResponse = {
-  images?: FalImageOutput[];
+type OpenRouterContentPart = {
+  type?: string;
+  text?: string;
+  image_url?: {
+    url?: string;
+  };
 };
 
-const FAL_NANO_BANANA_PRO_MODEL = "fal-ai/nano-banana-pro/edit";
+type OpenRouterGenerateResponse = {
+  choices?: Array<{
+    message?: {
+      images?: OpenRouterImageOutput[];
+      content?: string | OpenRouterContentPart[];
+    };
+  }>;
+};
+
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_NANO_BANANA_MODEL = "google/gemini-2.5-flash-image:nitro";
+
+function getOpenRouterApiKey(): string | null {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  return apiKey?.trim() ? apiKey.trim() : null;
+}
 
 function getFalApiKey(): string | null {
   const apiKey = process.env.FAL_KEY ?? process.env.FAL_API_KEY;
   return apiKey?.trim() ? apiKey.trim() : null;
 }
 
+export function hasPatentImageEnhancementApiKey(): boolean {
+  return hasOpenRouterApiKey();
+}
+
 export function hasFalApiKey(): boolean {
   return Boolean(getFalApiKey());
+}
+
+function getOpenRouterHeaders(apiKey: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+    "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    "X-Title": "InventorNet",
+  };
+}
+
+function extractGeneratedImageDataUrl(payload: OpenRouterGenerateResponse): string | null {
+  const message = payload.choices?.[0]?.message;
+  const directImageUrl = message?.images?.find((image) => typeof image.image_url === "string" || typeof image.url === "string");
+  if (directImageUrl?.image_url) {
+    return directImageUrl.image_url;
+  }
+  if (directImageUrl?.url) {
+    return directImageUrl.url;
+  }
+
+  if (Array.isArray(message?.content)) {
+    const imagePart = message.content.find((part) => part?.type === "image_url" && typeof part.image_url?.url === "string");
+    if (imagePart?.image_url?.url) {
+      return imagePart.image_url.url;
+    }
+  }
+
+  return null;
+}
+
+function decodeDataUri(dataUri: string): { buffer: Buffer; mimeType: string } {
+  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    throw new Error("OpenRouter Nano Banana enhancement returned an invalid image payload.");
+  }
+
+  return {
+    mimeType: match[1] ?? "image/png",
+    buffer: Buffer.from(match[2] ?? "", "base64"),
+  };
 }
 
 export function buildPatentComponentEnhancementPrompt(
@@ -180,9 +245,9 @@ export function isRateLimitErrorMessage(message: string): boolean {
 export async function enhancePatentComponentImage(
   input: PatentComponentEnhancementInput,
 ): Promise<PatentComponentEnhancementResult> {
-  const apiKey = getFalApiKey();
+  const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
-    throw new Error("FAL_KEY is missing. Add it to enable fal.ai Nano Banana Pro component enhancement.");
+    throw new Error("OPENROUTER_API_KEY is missing. Add it to enable OpenRouter Nano Banana component enhancement.");
   }
 
   if (input.referenceImages.length === 0) {
@@ -190,46 +255,54 @@ export async function enhancePatentComponentImage(
   }
 
   const prompt = buildPatentComponentEnhancementPrompt(input);
-  const imageUrls = input.referenceImages.slice(0, 3).map(buildDataUri);
-
-  const response = await fetch(`https://fal.run/${FAL_NANO_BANANA_PRO_MODEL}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${apiKey}`,
-      "Content-Type": "application/json",
+  const imageContent = input.referenceImages.slice(0, 3).map((referenceImage) => ({
+    type: "image_url",
+    image_url: {
+      url: buildDataUri(referenceImage),
     },
+  }));
+
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: getOpenRouterHeaders(apiKey),
     body: JSON.stringify({
-      prompt,
-      image_urls: imageUrls,
-      num_images: 1,
-      aspect_ratio: "auto",
-      output_format: "png",
-      resolution: "1K",
-      limit_generations: true,
+      model: OPENROUTER_NANO_BANANA_MODEL,
+      modalities: ["image", "text"],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: prompt,
+            },
+            ...imageContent,
+          ],
+        },
+      ],
+      stream: false,
+      image_config: {
+        aspect_ratio: "1:1",
+      },
     }),
   });
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`fal.ai Nano Banana Pro enhancement failed (${response.status}): ${body.slice(0, 400)}`);
+    throw new Error(`OpenRouter Nano Banana enhancement failed (${response.status}): ${body.slice(0, 400)}`);
   }
 
-  const payload = (await response.json()) as FalGenerateResponse;
-  const generatedImage = payload.images?.[0];
-  if (!generatedImage?.url) {
-    throw new Error("fal.ai Nano Banana Pro enhancement returned no image output.");
+  const payload = (await response.json()) as OpenRouterGenerateResponse;
+  const generatedImageDataUrl = extractGeneratedImageDataUrl(payload);
+  if (!generatedImageDataUrl) {
+    throw new Error("OpenRouter Nano Banana enhancement returned no image output.");
   }
 
-  const imageResponse = await fetch(generatedImage.url);
-  if (!imageResponse.ok) {
-    throw new Error(`fal.ai generated image download failed (${imageResponse.status}).`);
-  }
-
-  const arrayBuffer = await imageResponse.arrayBuffer();
+  const { buffer, mimeType } = decodeDataUri(generatedImageDataUrl);
 
   return {
-    imageBuffer: Buffer.from(arrayBuffer),
-    mimeType: generatedImage.content_type ?? imageResponse.headers.get("content-type") ?? "image/png",
-    model: FAL_NANO_BANANA_PRO_MODEL,
+    imageBuffer: buffer,
+    mimeType,
+    model: OPENROUTER_NANO_BANANA_MODEL,
   };
 }
