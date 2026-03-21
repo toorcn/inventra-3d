@@ -46,11 +46,11 @@ export function InventionCard({ invention, isSelected, onClick }: InventionCardP
           </div>
         </div>
 
-        {/* Meta row — year • country • category */}
+        {/* Meta row — year • location • category */}
         <div className="mt-1 flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-medium tabular-nums text-white/35">{invention.year}</span>
           <span className="text-white/15">·</span>
-          <span className="truncate text-[11px] text-white/35">{invention.country}</span>
+          <span className="truncate text-[11px] text-white/35">{invention.location.label}</span>
           <span className="text-white/15">·</span>
           <span
             className="text-[10px] font-bold uppercase tracking-wide"
@@ -58,6 +58,11 @@ export function InventionCard({ invention, isSelected, onClick }: InventionCardP
           >
             {category.name}
           </span>
+        </div>
+
+        {/* Avatar persona — subtle */}
+        <div className="mt-1">
+          <span className="text-[10px] text-white/20 italic">{invention.avatarPersona}</span>
         </div>
       </div>
     </button>

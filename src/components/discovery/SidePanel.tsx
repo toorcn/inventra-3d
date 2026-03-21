@@ -5,6 +5,7 @@ import { InventionDetail } from "@/components/discovery/InventionDetail";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { CategoryId, Invention } from "@/types";
 import { Layers, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { InventionCard } from "./InventionCard";
 
 interface SidePanelProps {
@@ -30,6 +31,45 @@ export function SidePanel({
   onSearchSubmit,
   isSearching,
 }: SidePanelProps) {
+  const [exaSearching, setExaSearching] = useState(false);
+
+  async function handleSearchSubmit(query: string) {
+    // Keep existing local filter behaviour
+    onSearchSubmit(query);
+
+    if (!query.trim()) return;
+
+    setExaSearching(true);
+    try {
+      const res = await fetch("/api/exa-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as {
+          inventionId: string | null;
+          lat: number;
+          lng: number;
+          regionName: string;
+        };
+
+        if (data.inventionId) {
+          onSelectInvention(data.inventionId);
+          window.dispatchEvent(
+            new CustomEvent("exaSearchResult", {
+              detail: { lat: data.lat, lng: data.lng, regionName: data.regionName },
+            }),
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[SidePanel] exa-search error:", err);
+    } finally {
+      setExaSearching(false);
+    }
+  }
   if (selectedInvention) {
     return (
       <aside className="pointer-events-auto flex h-full w-96 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0d14]/80 shadow-2xl shadow-black/40 backdrop-blur-2xl">
@@ -74,9 +114,9 @@ export function SidePanel({
         <SearchInput
           value={searchValue}
           onChange={onSearchChange}
-          onSubmit={onSearchSubmit}
+          onSubmit={handleSearchSubmit}
           placeholder="Try: renewable energy in Europe"
-          isLoading={isSearching}
+          isLoading={isSearching || exaSearching}
         />
       </div>
 
