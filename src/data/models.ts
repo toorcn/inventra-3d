@@ -55,8 +55,8 @@ export const modelDefinitions: ModelDefinition[] = [
   {
     inventionId: "macintosh",
     components: buildComponentModels("macintosh"),
-    cameraPosition: [0, 0.95, 6],
-    cameraTarget: [0, 0.35, 0],
+    cameraPosition: [0.35, 0.55, 7.2],
+    cameraTarget: [0.2, -0.05, 0.35],
   },
   {
     inventionId: "light-bulb",

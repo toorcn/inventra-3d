@@ -11,6 +11,8 @@ const macintoshComponentIds = [
   "macintosh-logic-board",
   "macintosh-analog-board",
   "macintosh-speaker",
+  "macintosh-keyboard",
+  "macintosh-mouse",
 ];
 
 describe("macintosh seeded data", () => {
