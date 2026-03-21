@@ -81,3 +81,43 @@ describe("validateCropQuality", () => {
     expect(result.issues).toContain("partial_cutoff");
   });
 });
+
+describe("quality gate integration", () => {
+  it("routes borderline crop with failed AI validation to figure_context evidenceMode", () => {
+    const cropValidation = {
+      hasGeometry: false,
+      coverageFraction: 0.1,
+      issues: ["label_only"],
+    };
+    const currentEvidenceMode = "direct_crop";
+
+    const cropFailed = !cropValidation.hasGeometry ||
+      cropValidation.coverageFraction < 0.30 ||
+      cropValidation.issues.some((i: string) => ["label_only", "partial_cutoff"].includes(i));
+
+    const newEvidenceMode = cropFailed && currentEvidenceMode === "direct_crop"
+      ? "figure_context"
+      : currentEvidenceMode;
+
+    expect(newEvidenceMode).toBe("figure_context");
+  });
+
+  it("keeps direct_crop evidenceMode when AI validation passes", () => {
+    const cropValidation = {
+      hasGeometry: true,
+      coverageFraction: 0.65,
+      issues: [],
+    };
+    const currentEvidenceMode = "direct_crop";
+
+    const cropFailed = !cropValidation.hasGeometry ||
+      cropValidation.coverageFraction < 0.30 ||
+      cropValidation.issues.some((i: string) => ["label_only", "partial_cutoff"].includes(i));
+
+    const newEvidenceMode = cropFailed && currentEvidenceMode === "direct_crop"
+      ? "figure_context"
+      : currentEvidenceMode;
+
+    expect(newEvidenceMode).toBe("direct_crop");
+  });
+});

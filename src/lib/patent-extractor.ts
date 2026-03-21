@@ -2,9 +2,11 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { hasOpenRouterApiKey } from "@/lib/openrouter";
+import { triageCropQuality, validateCropQuality } from "@/lib/patent-crop-validator";
 import { hasFalApiKey } from "@/lib/patent-image-enhancer";
 import {
   createPatentWorkspaceManifest,
+  type CropValidation,
   type NormalizedRegion,
   type PatentAssetKind,
   type PatentExtractionResult,
@@ -797,13 +799,35 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
         let imagePath = figureImagePath;
 
         let quality = figureQuality;
+        let cropValidation: CropValidation | undefined;
         if (detectionRegion) {
           const paddedRegion = expandRegion(detectionRegion, 0.1);
           const detectionBuffer = await cropImageByRegion(imageBuffer, paddedRegion);
           quality = await analyzeCropQuality(detectionBuffer);
+
+          const routeDecision = triageCropQuality(quality.score, quality.issues);
+          if (routeDecision === "skip") {
+            continue;
+          }
           if (!shouldKeepDetection(detection.name, quality, paddedRegion)) {
             continue;
           }
+
+          if (routeDecision === "validate") {
+            try {
+              const imageBase64 = `data:image/png;base64,${detectionBuffer.toString("base64")}`;
+              cropValidation = await validateCropQuality({
+                imageBase64,
+                refNumber: detection.refNumber ?? "unknown",
+                componentName: detection.name,
+                componentKind: detection.kind,
+              });
+            } catch {
+              // AI validation failed — treat as borderline pass
+              cropValidation = undefined;
+            }
+          }
+
           imageFilename = `candidate-p${pageNumber}-${safeLabel}-${componentToken}.png`;
           const candidateAbsolutePath = path.join(diskPaths.candidateAbsoluteDirectory, imageFilename);
           await writeFile(candidateAbsolutePath, detectionBuffer);
@@ -825,6 +849,7 @@ export async function extractPatentFigures(input: PatentExtractionInput): Promis
           sourceFigureId: `${safeLabel || `fig-p${pageNumber}`}-${pageNumber}`,
           qualityScore: quality.score,
           qualityIssues: quality.issues,
+          cropValidation,
           scaleHints: buildScaleHints(detectionRegion),
         });
       }

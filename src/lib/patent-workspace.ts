@@ -39,6 +39,7 @@ export type PatentFigureComponentDetection = {
   sourceFigureId: string;
   qualityScore?: number;
   qualityIssues?: string[];
+  cropValidation?: CropValidation;
   scaleHints?: PatentScaleHints;
 };
 
@@ -77,6 +78,7 @@ export type PatentComponentCandidate = {
   clusterKey: string;
   qualityScore?: number;
   qualityIssues?: string[];
+  cropValidation?: CropValidation;
   scaleHints?: PatentScaleHints;
   region: NormalizedRegion | null;
 };
@@ -1116,13 +1118,25 @@ function attachAssemblyParents(
       averageQuality(component.evidence.map((item) => item.qualityScore)),
     );
     const textEvidenceStrength = textSnippets.length === 0 ? 0 : Math.min(1, 0.35 + textSnippets.length * 0.2);
-    const evidenceMode: PatentEvidenceMode = hasDedicatedCandidateCrop
+    let evidenceMode: PatentEvidenceMode = hasDedicatedCandidateCrop
       ? visualEvidenceStrength < 0.55 && textEvidenceStrength > 0
         ? "contextual_inferred"
         : "direct_crop"
       : textEvidenceStrength > 0
         ? "contextual_inferred"
         : "figure_context";
+
+    // After existing evidenceMode derivation, override if crop validation failed
+    const bestEvidence = component.evidence[0];
+    if (bestEvidence?.cropValidation) {
+      const cv = bestEvidence.cropValidation;
+      const cropFailed = !cv.hasGeometry || cv.coverageFraction < 0.30 ||
+        cv.issues.some(i => ["label_only", "partial_cutoff"].includes(i));
+      if (cropFailed && evidenceMode === "direct_crop") {
+        evidenceMode = "figure_context";
+      }
+    }
+
     const inferenceStatus: PatentInferenceStatus =
       evidenceMode === "direct_crop" ? "direct" : evidenceMode === "figure_context" ? "partial" : "inferred";
 
@@ -1399,6 +1413,7 @@ function createBaseComponentRecord(
     confidence: candidate.confidence,
     qualityScore: candidate.qualityScore,
     qualityIssues: candidate.qualityIssues,
+    cropValidation: candidate.cropValidation,
     scaleHints: candidate.scaleHints,
     region: candidate.region,
   }));
@@ -1700,6 +1715,7 @@ export function createPatentWorkspaceManifest(
         imageFilename: detection.imageFilename,
         qualityScore: detection.qualityScore,
         qualityIssues: detection.qualityIssues,
+        cropValidation: detection.cropValidation,
         scaleHints: detection.scaleHints,
         region: detection.region,
       }),
