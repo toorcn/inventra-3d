@@ -47,6 +47,36 @@ describe("buildPatentComponentEnhancementPrompt", () => {
     expect(prompt).toContain("Render one isolated centered asset");
   });
 
+  it("produces full-figure extraction instructions when evidenceMode is figure_context", () => {
+    const prompt = buildPatentComponentEnhancementPrompt({
+      variant: "realistic_display",
+      canonicalName: "gasket",
+      canonicalLabel: "gasket",
+      canonicalRefNumber: "14",
+      kind: "seal",
+      componentRole: "interface",
+      buildableStatus: "buildable",
+      evidenceMode: "figure_context",
+      inferenceStatus: "partial",
+      summary: "Sealing element between housing and cover.",
+      functionDescription: "Prevents fluid leakage at the junction.",
+      refNumbers: ["14"],
+      supportingFigures: ["FIG. 1", "FIG. 3"],
+      rootProductName: "valve assembly",
+      rootProductDescription: "Industrial valve.",
+      parentAssemblyName: "Housing",
+      relatedComponentNames: ["cover", "bolt"],
+      assemblyChildRefNumbers: [],
+      textSnippets: ["Gasket 14 is positioned between housing 10 and cover 12."],
+      evidencePolicyNote: "Use broader figure context.",
+      scaleHints: { normalizedWidth: 0.3, normalizedHeight: 0.05, relativeArea: 0.015 },
+    });
+
+    expect(prompt).toContain("ISOLATE and EXTRACT");
+    expect(prompt).toContain("reference number 14");
+    expect(prompt).toContain("from the full patent figure");
+  });
+
   it("tightens framing instructions for 3D source renders", () => {
     const prompt = buildPatentComponentEnhancementPrompt({
       variant: "three_d_source",

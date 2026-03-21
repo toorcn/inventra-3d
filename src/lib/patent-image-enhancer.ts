@@ -96,12 +96,20 @@ export function buildPatentComponentEnhancementPrompt(
         : input.kind === "subassembly"
           ? "Render the complete subassembly centered on a clean neutral studio background."
           : "Render one isolated centered asset on a clean neutral studio background.";
-  const inferenceInstruction =
-    input.evidenceMode === "contextual_inferred" || input.inferenceStatus === "inferred"
-      ? "No clean standalone figure exists for this part. Use nearby figures, ref-number context, and patent function text to reconstruct the most likely form. Missing details may be inferred conservatively from patent context. If inferred, keep geometry plausible and mechanically manufacturable. Do not invent decorative details or modern consumer styling."
-      : input.evidenceMode === "figure_context"
-        ? "Dedicated standalone crops are limited. Use the broader figure context to preserve correct proportions and mating surfaces."
-        : "Use the direct patent evidence views as the primary grounding for geometry and silhouette.";
+  let inferenceInstruction: string;
+  if (input.evidenceMode === "contextual_inferred" || input.inferenceStatus === "inferred") {
+    inferenceInstruction =
+      "No clean standalone figure exists for this part. Use nearby figures, ref-number context, and patent function text to reconstruct the most likely form. Missing details may be inferred conservatively from patent context. If inferred, keep geometry plausible and mechanically manufacturable. Do not invent decorative details or modern consumer styling.";
+  } else if (input.evidenceMode === "figure_context") {
+    inferenceInstruction = [
+      `The reference images show FULL patent figures, not isolated crops. You must ISOLATE and EXTRACT only the component identified as reference number ${input.canonicalRefNumber} ("${input.canonicalName}") from the full patent figure.`,
+      `Focus on the geometry associated with ref ${input.canonicalRefNumber}. Ignore all other components, leader lines, and annotations in the figure.`,
+      `Generate a clean, isolated view showing ONLY this component against a neutral background.`,
+    ].join(" ");
+  } else {
+    inferenceInstruction =
+      "Use the direct patent evidence views as the primary grounding for geometry and silhouette.";
+  }
 
   const scaleHint =
     input.scaleHints && input.scaleHints.relativeArea > 0
