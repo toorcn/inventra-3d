@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#141e38"/>
+      <stop offset="100%" stop-color="#0a0b14"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d4af55" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#d4af55" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d4af55" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#e8722a" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#e8722a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="engineBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e2d50"/>
+      <stop offset="50%" stop-color="#141e38"/>
+      <stop offset="100%" stop-color="#0f1525"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <ellipse cx="200" cy="150" rx="155" ry="100" fill="url(#glow)"/>
+
+  <!-- Exhaust flame plume -->
+  <path d="M 305 118 C 340 125, 380 140, 400 150 C 380 160, 340 175, 305 182 Z"
+        fill="url(#flame)" opacity="0.85"/>
+  <!-- Inner hot core -->
+  <path d="M 305 135 C 330 140, 365 147, 385 150 C 365 153, 330 160, 305 165 Z"
+        fill="#e8722a" opacity="0.5"/>
+
+  <!-- Engine outer nacelle -->
+  <path d="M 70 150 C 72 100, 80 82, 95 78 L 295 78 C 310 78, 318 90, 320 118 L 320 182 C 318 210, 310 222, 295 222 L 95 222 C 80 218, 72 200, 70 150 Z"
+        fill="url(#engineBody)" stroke="#d4af55" stroke-width="2" stroke-opacity="0.8"/>
+
+  <!-- Intake lip -->
+  <ellipse cx="80" cy="150" rx="18" ry="72" fill="none" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.9"/>
+  <ellipse cx="80" cy="150" rx="12" ry="55" fill="rgba(212,175,85,0.05)" stroke="rgba(212,175,85,0.4)" stroke-width="1"/>
+
+  <!-- Fan blades at intake -->
+  <g transform="translate(95,150)">
+    <line x1="0" y1="-50" x2="0" y2="50" stroke="#d4af55" stroke-width="3" stroke-opacity="0.85"/>
+    <line x1="-50" y1="0" x2="50" y2="0" stroke="#d4af55" stroke-width="3" stroke-opacity="0.85"/>
+    <line x1="-35" y1="-35" x2="35" y2="35" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.7"/>
+    <line x1="35" y1="-35" x2="-35" y2="35" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.7"/>
+    <!-- Fan center hub -->
+    <circle cx="0" cy="0" r="9" fill="#141e38" stroke="#d4af55" stroke-width="2"/>
+    <circle cx="0" cy="0" r="4" fill="#d4af55" opacity="0.8"/>
+  </g>
+
+  <!-- Compressor section dividers -->
+  <line x1="148" y1="88" x2="148" y2="212" stroke="rgba(212,175,85,0.35)" stroke-width="1.5"/>
+  <line x1="185" y1="84" x2="185" y2="216" stroke="rgba(212,175,85,0.35)" stroke-width="1.5"/>
+  <line x1="220" y1="82" x2="220" y2="218" stroke="rgba(212,175,85,0.35)" stroke-width="1.5"/>
+
+  <!-- Compressor blade sets -->
+  <!-- Stage 1 -->
+  <g stroke="#f5f0e1" stroke-width="2" stroke-opacity="0.65">
+    <line x1="155" y1="93" x2="148" y2="110"/>
+    <line x1="162" y1="91" x2="155" y2="108"/>
+    <line x1="169" y1="89" x2="162" y2="106"/>
+    <line x1="155" y1="190" x2="148" y2="207"/>
+    <line x1="162" y1="192" x2="155" y2="209"/>
+    <line x1="169" y1="194" x2="162" y2="211"/>
+  </g>
+  <!-- Stage 2 -->
+  <g stroke="#f5f0e1" stroke-width="2" stroke-opacity="0.65">
+    <line x1="192" y1="89" x2="185" y2="106"/>
+    <line x1="199" y1="87" x2="192" y2="104"/>
+    <line x1="206" y1="86" x2="199" y2="103"/>
+    <line x1="192" y1="194" x2="185" y2="211"/>
+    <line x1="199" y1="196" x2="192" y2="213"/>
+    <line x1="206" y1="197" x2="199" y2="214"/>
+  </g>
+
+  <!-- Combustion chamber glow -->
+  <ellipse cx="248" cy="150" rx="25" ry="45" fill="rgba(232,114,42,0.12)" stroke="rgba(232,114,42,0.35)" stroke-width="1.5"/>
+  <ellipse cx="248" cy="150" rx="14" ry="28" fill="rgba(232,114,42,0.18)"/>
+
+  <!-- Turbine section -->
+  <g transform="translate(283,150)">
+    <line x1="0" y1="-38" x2="0" y2="38" stroke="#d4af55" stroke-width="3" stroke-opacity="0.85"/>
+    <line x1="-38" y1="0" x2="38" y2="0" stroke="#d4af55" stroke-width="3" stroke-opacity="0.85"/>
+    <line x1="-27" y1="-27" x2="27" y2="27" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+    <line x1="27" y1="-27" x2="-27" y2="27" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+    <circle cx="0" cy="0" r="8" fill="#141e38" stroke="#d4af55" stroke-width="2"/>
+    <circle cx="0" cy="0" r="3.5" fill="#d4af55" opacity="0.8"/>
+  </g>
+
+  <!-- Nozzle cone -->
+  <path d="M 305 118 L 322 133 L 322 167 L 305 182 Z"
+        fill="rgba(20,30,56,0.9)" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.7"/>
+
+  <!-- Airflow arrows -->
+  <g fill="#d4af55" opacity="0.4">
+    <polygon points="35,144 45,150 35,156"/>
+    <polygon points="48,144 58,150 48,156"/>
+  </g>
+
+  <!-- Labels -->
+  <text x="82" y="260" text-anchor="middle" font-family="monospace" font-size="8" fill="#f5f0e1" opacity="0.5">INTAKE</text>
+  <text x="165" y="260" text-anchor="middle" font-family="monospace" font-size="8" fill="#f5f0e1" opacity="0.5">COMPRESS</text>
+  <text x="248" y="260" text-anchor="middle" font-family="monospace" font-size="8" fill="#f5f0e1" opacity="0.5">COMBUST</text>
+  <text x="283" y="260" text-anchor="middle" font-family="monospace" font-size="8" fill="#f5f0e1" opacity="0.5">TURBINE</text>
+  <text x="340" y="260" text-anchor="middle" font-family="monospace" font-size="8" fill="#f5f0e1" opacity="0.5">EXHAUST</text>
+
+  <!-- Bottom label -->
+  <text x="200" y="285" text-anchor="middle" font-family="monospace" font-size="12" fill="#d4af55" opacity="0.85" letter-spacing="2">JET ENGINE</text>
+</svg>

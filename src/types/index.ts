@@ -4,7 +4,8 @@ export type CategoryId =
   | "energy"
   | "materials"
   | "computing"
-  | "transportation";
+  | "transportation"
+  | "other";
 
 export interface Invention {
   id: string;
@@ -215,6 +216,12 @@ export interface GlobeMarker {
   category: CategoryId;
   color: string;
   size: number;
+}
+
+export interface CountryHoverData {
+  countryCode: string;
+  country: string;
+  inventions: Invention[];
 }
 
 export interface GlobeViewState {

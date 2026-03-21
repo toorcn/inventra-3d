@@ -1,0 +1,49 @@
+
+> inventra@0.1.0 build
+> next build
+
+   Γû▓ Next.js 15.5.14
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./src/hooks/useVoiceSession.ts
+Module not found: Can't resolve 'agora-rtc-sdk-ng'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/app/invention/[id]/page.tsx
+
+./src/lib/pusher-client.ts
+Module not found: Can't resolve 'pusher-js'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/hooks/useVoiceSession.ts
+./src/app/invention/[id]/page.tsx
+
+./src/lib/agora.ts
+Module not found: Can't resolve 'agora-access-token'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/app/api/voice/llm/route.ts
+
+./src/lib/pusher.ts
+Module not found: Can't resolve 'pusher'
+Did you mean './pusher'?
+Requests that should resolve in the current directory need to start with './'.
+Requests that start with a name are treated as module requests and resolve within module directories (node_modules).
+If changing the source code is not an option there is also a resolve options called 'preferRelative' which tries to resolve these kind of requests in the current directory too.
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/chat-service.ts
+./src/app/api/chat/route.ts
+
+
+> Build failed because of webpack errors

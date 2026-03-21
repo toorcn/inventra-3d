@@ -12,6 +12,7 @@ export const categories: Category[] = [
     color: "#EF4444",
     icon: "Plane",
   },
+  { id: "other", name: "Other", color: "#9CA3AF", icon: "Package" },
 ];
 
 export const categoryColorMap: Record<CategoryId, string> = categories.reduce(

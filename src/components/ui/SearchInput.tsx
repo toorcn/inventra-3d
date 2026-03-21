@@ -39,7 +39,7 @@ export function SearchInput({
 
   return (
     <div
-      className={`flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-[var(--text-primary)] transition-all focus-within:border-blue-400/60 focus-within:shadow-[var(--glow-blue)] ${className}`}
+      className={`flex h-11 items-center gap-2 rounded-xl border border-[var(--border-gold)] bg-black/30 px-3 text-sm text-[var(--text-primary)] transition-all focus-within:border-[var(--accent-gold)]/60 focus-within:shadow-[var(--glow-gold)] ${className}`}
     >
       {isLoading ? <Spinner size="sm" /> : <Search className="size-4 text-[var(--text-secondary)]" />}
       <input
@@ -53,7 +53,7 @@ export function SearchInput({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="rounded-full p-1 text-[var(--text-secondary)] hover:bg-white/10 hover:text-white"
+          className="rounded-full p-1 text-[var(--text-secondary)] hover:bg-white/10 hover:text-[var(--text-primary)]"
           aria-label="Clear search"
         >
           <X className="size-4" />

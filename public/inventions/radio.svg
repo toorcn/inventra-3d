@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#141e38"/>
+      <stop offset="100%" stop-color="#0a0b14"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#d4af55" stop-opacity="0.13"/>
+      <stop offset="100%" stop-color="#d4af55" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <ellipse cx="200" cy="155" rx="170" ry="130" fill="url(#glow)"/>
+
+  <!-- Radio wave arcs (largest to smallest, left side) -->
+  <path d="M 175 150 C 145 120, 115 115, 105 150 C 115 185, 145 180, 175 150"
+        fill="none" stroke="#d4af55" stroke-width="2" stroke-opacity="0.25"/>
+  <path d="M 175 150 C 130 108, 88 105, 75 150 C 88 195, 130 192, 175 150"
+        fill="none" stroke="#d4af55" stroke-width="2" stroke-opacity="0.2"/>
+  <path d="M 175 150 C 115 96, 60 95, 45 150 C 60 205, 115 204, 175 150"
+        fill="none" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.12"/>
+
+  <!-- Radio wave arcs (right side - primary) -->
+  <!-- Arc 1 - close -->
+  <path d="M 200 92 C 230 95, 248 120, 248 150 C 248 180, 230 205, 200 208"
+        fill="none" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.7"/>
+  <!-- Arc 2 - medium -->
+  <path d="M 200 72 C 248 77, 278 110, 278 150 C 278 190, 248 223, 200 228"
+        fill="none" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.55"/>
+  <!-- Arc 3 - large -->
+  <path d="M 200 52 C 265 58, 308 100, 308 150 C 308 200, 265 242, 200 248"
+        fill="none" stroke="#d4af55" stroke-width="2" stroke-opacity="0.4"/>
+  <!-- Arc 4 - largest -->
+  <path d="M 200 32 C 283 40, 338 90, 338 150 C 338 210, 283 260, 200 268"
+        fill="none" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.25"/>
+
+  <!-- Tower base structure -->
+  <!-- Tower legs -->
+  <line x1="190" y1="245" x2="178" y2="272" stroke="#d4af55" stroke-width="3" stroke-opacity="0.85"/>
+  <line x1="210" y1="245" x2="222" y2="272" stroke="#d4af55" stroke-width="3" stroke-opacity="0.85"/>
+  <!-- Cross braces -->
+  <line x1="182" y1="258" x2="218" y2="258" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+  <line x1="180" y1="265" x2="220" y2="265" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+
+  <!-- Tower body (tapering upward) -->
+  <!-- Lower section -->
+  <line x1="183" y1="205" x2="178" y2="248" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.85"/>
+  <line x1="217" y1="205" x2="222" y2="248" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.85"/>
+  <!-- Lower cross-brace -->
+  <line x1="183" y1="218" x2="217" y2="232" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="183" y1="232" x2="217" y2="218" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="183" y1="205" x2="217" y2="205" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+
+  <!-- Middle section -->
+  <line x1="188" y1="165" x2="183" y2="205" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.85"/>
+  <line x1="212" y1="165" x2="217" y2="205" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.85"/>
+  <!-- Middle cross-brace -->
+  <line x1="188" y1="175" x2="212" y2="192" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="188" y1="192" x2="212" y2="175" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="188" y1="165" x2="212" y2="165" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+
+  <!-- Upper section (narrow) -->
+  <line x1="193" y1="130" x2="188" y2="165" stroke="#d4af55" stroke-width="2" stroke-opacity="0.85"/>
+  <line x1="207" y1="130" x2="212" y2="165" stroke="#d4af55" stroke-width="2" stroke-opacity="0.85"/>
+  <line x1="193" y1="148" x2="207" y2="148" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="193" y1="130" x2="207" y2="130" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.7"/>
+
+  <!-- Antenna mast -->
+  <line x1="200" y1="55" x2="200" y2="130" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.9"/>
+
+  <!-- Antenna tip ball -->
+  <circle cx="200" cy="52" r="4" fill="#d4af55" opacity="0.9"/>
+  <!-- Antenna cross pieces -->
+  <line x1="192" y1="80" x2="208" y2="80" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.7"/>
+  <line x1="194" y1="95" x2="206" y2="95" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.6"/>
+  <line x1="195" y1="110" x2="205" y2="110" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.5"/>
+
+  <!-- Signal pulse dot at origin -->
+  <circle cx="200" cy="150" r="5" fill="#d4af55" opacity="0.85"/>
+  <circle cx="200" cy="150" r="9" fill="none" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.5"/>
+
+  <!-- Ground plane -->
+  <line x1="160" y1="272" x2="240" y2="272" stroke="rgba(212,175,85,0.5)" stroke-width="2"/>
+
+  <!-- Bottom label -->
+  <text x="200" y="292" text-anchor="middle" font-family="monospace" font-size="13" fill="#d4af55" opacity="0.85" letter-spacing="3">RADIO</text>
+</svg>
