@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 function createCameraController(): GlobeCameraController {
   return {
     flyToInvention: vi.fn(),
+    flyToCountries: vi.fn(),
     reset: vi.fn(),
     pauseAutoRotate: vi.fn(),
     resumeAutoRotateAfterDelay: vi.fn(),

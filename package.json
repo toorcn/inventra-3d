@@ -12,6 +12,7 @@
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/hands": "^0.4.1675469240",
+    "@next/swc-darwin-arm64": "^15.5.14",
     "agora-rtc-sdk-ng": "^4.24.3",
     "cesium": "^1.139.1",
     "copy-webpack-plugin": "^14.0.0",
@@ -19,6 +20,7 @@
     "exa-js": "^2.8.0",
     "lucide-react": "^0.577.0",
     "next": "15.5.14",
+    "playwright": "^1.58.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "^10.1.0",

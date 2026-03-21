@@ -5,8 +5,10 @@ import type { Invention } from "@/types";
 
 interface CesiumGlobeProps {
   onInventionSelect: (invention: Invention) => void;
+  onCountrySelect: (countryCode: string) => void;
   onCameraReady?: (controller: GlobeCameraController | null) => void;
   selectedInventionId?: string;
+  highlightedCountryCodes?: string[];
   temporosYear: number;
 }
 
