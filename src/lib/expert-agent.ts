@@ -244,6 +244,14 @@ export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): Ex
   return actions;
 }
 
+const TOOL_NAMES_PATTERN = "highlight_components|select_component|explode_model|assemble_model|reset_viewer|emit_beam";
+
+function stripEmbeddedToolSyntax(text: string): string {
+  // Remove patterns like {highlight_components componentIds=["x"] ...} that the LLM
+  // sometimes embeds in prose despite being told not to.
+  return text.replace(new RegExp(`\\{(?:${TOOL_NAMES_PATTERN})[^}]*\\}`, "g"), "").replace(/  +/g, " ").trim();
+}
+
 export async function runExpertAgent(
   invention: Invention,
   messages: OpenRouterMessage[],
@@ -317,7 +325,7 @@ Do not embed component IDs or any tool syntax inside reply. Use toolCalls to tri
     .filter((value): value is ToolCall => value !== null);
 
   return {
-    content: parsed.reply,
+    content: stripEmbeddedToolSyntax(parsed.reply),
     actions: executeToolCalls(invention.id, toolCalls),
   };
 }
