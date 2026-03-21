@@ -159,6 +159,7 @@ function toStructuredToolCall(raw: AgentModelResponse["toolCalls"][number]): Too
 export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): ExpertAction[] {
   const componentIds = new Set(getComponentsByInventionId(inventionId).map((item) => item.id));
   const actions: ExpertAction[] = [];
+  const selectedComponentIds = new Set<string>();
 
   for (const toolCall of toolCalls) {
     if (toolCall.name === "highlight_components") {
@@ -171,6 +172,17 @@ export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): Ex
           color: toolCall.arguments.color,
           mode: toolCall.arguments.mode,
         });
+
+        // Keep the mini explainer card aligned with single-component highlights
+        // even when the model omits an explicit select tool call.
+        if (validIds.length === 1 && !selectedComponentIds.has(validIds[0])) {
+          actions.push({
+            type: "select",
+            componentId: validIds[0],
+            durationMs: toolCall.arguments.durationMs,
+          });
+          selectedComponentIds.add(validIds[0]);
+        }
       }
       continue;
     }
@@ -182,6 +194,7 @@ export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): Ex
           componentId: toolCall.arguments.componentId,
           durationMs: toolCall.arguments.durationMs,
         });
+        selectedComponentIds.add(toolCall.arguments.componentId);
       }
       continue;
     }
