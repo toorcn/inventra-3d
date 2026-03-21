@@ -357,6 +357,7 @@ export function buildPatentAssemblyContract(input: {
     explodedOffset,
     fitStatus: warnings.length === 0 ? "pass" : "warn",
     fitWarnings: warnings,
+    placementTier: 1,
     orientationBasis: DEFAULT_ORIENTATION_BASIS,
   };
 }

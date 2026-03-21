@@ -87,6 +87,21 @@ export type PatentScaleHints = {
   relativeArea: number;
 };
 
+export interface CropValidation {
+  hasGeometry: boolean;
+  coverageFraction: number; // 0-1 normalized
+  issues: string[];         // e.g., ["label_only", "partial_cutoff", "mostly_whitespace"]
+}
+
+export interface SpatialRelationship {
+  ref: string;
+  relation: 'between' | 'through' | 'attached_to' | 'inside' | 'adjacent' | 'surrounds';
+  targets: string[];
+  axis?: 'x' | 'y' | 'z';
+  side?: 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back';
+  offset?: number;
+}
+
 export type PatentComponentEvidence = {
   candidateId: string;
   figureId: string;
@@ -100,6 +115,7 @@ export type PatentComponentEvidence = {
   confidence: number;
   qualityScore?: number;
   qualityIssues?: string[];
+  cropValidation?: CropValidation;
   scaleHints?: PatentScaleHints;
   region: NormalizedRegion | null;
 };
@@ -169,6 +185,7 @@ export type PatentAssemblyContract = {
   explodedOffset: [number, number, number];
   fitStatus: PatentAssemblyFitStatus;
   fitWarnings: string[];
+  placementTier: 1 | 2 | 3;
   orientationBasis: PatentOrientationBasis;
 };
 
