@@ -4,13 +4,13 @@ import { DemoOverlay } from "./DemoOverlay";
 import { useEffect, useMemo, useState } from "react";
 
 const STEPS = [
-  "Welcome to InventorNet — explore 25 breakthrough inventions globally.",
+  "Welcome to Inventra — explore 25 breakthrough inventions globally.",
   "Discover innovation by geography with an interactive 3D globe.",
   "Filter by domain like energy, computing, biology, and materials.",
   "Select an invention to open immersive 3D exploration.",
   "Explode the model to inspect core components.",
   "Ask the AI expert for contextual technical explanations.",
-  "InventorNet turns static patent data into interactive understanding.",
+  "Inventra turns static patent data into interactive understanding.",
 ];
 
 interface DemoModeProps {

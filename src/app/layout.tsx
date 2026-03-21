@@ -13,7 +13,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "InventorNet",
+  title: "Inventra",
   description: "Explore global inventions with an immersive 3D discovery experience.",
 };
 

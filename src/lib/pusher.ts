@@ -1,7 +1,7 @@
 import Pusher from "pusher";
 
 declare global {
-  var __inventornetPusherServer__: Pusher | null | undefined;
+  var __inventraPusherServer__: Pusher | null | undefined;
 }
 
 function createPusherServer(): Pusher | null {
@@ -16,8 +16,8 @@ function createPusherServer(): Pusher | null {
 }
 
 export const pusherServer: Pusher | null =
-  globalThis.__inventornetPusherServer__ ??
-  (globalThis.__inventornetPusherServer__ = createPusherServer());
+  globalThis.__inventraPusherServer__ ??
+  (globalThis.__inventraPusherServer__ = createPusherServer());
 
 export function hasPusherConfig(): boolean {
   return pusherServer !== null;

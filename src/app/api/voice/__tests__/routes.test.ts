@@ -95,7 +95,7 @@ describe("voice routes", () => {
     expect(response.status).toBe(200);
     expect(payload.enabled).toBe(true);
     expect(payload.sessionId).toBeTruthy();
-    expect(payload.channelName).toContain("inventornet-");
+    expect(payload.channelName).toContain("inventra-");
     expect(payload.appId).toBe("test-app-id");
     expect(typeof payload.rtcUid).toBe("number");
     expect(typeof payload.rtcToken).toBe("string");

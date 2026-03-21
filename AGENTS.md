@@ -1,6 +1,6 @@
-# InventorNet — Codex Agent Instructions
+# Inventra — Codex Agent Instructions
 
-You are working in **InventorNet**, a **Next.js (App Router) + React** app for exploring a curated inventions dataset on an interactive **3D globe**, with optional **3D “exploded view”** models and an **AI expert chat** panel.
+You are working in **Inventra**, a **Next.js (App Router) + React** app for exploring a curated inventions dataset on an interactive **3D globe**, with optional **3D “exploded view”** models and an **AI expert chat** panel.
 
 ## North Star
 

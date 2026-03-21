@@ -29,12 +29,12 @@ type CreateVoiceSessionInput = {
 };
 
 declare global {
-  var __inventornetVoiceSessions__: Map<string, VoiceSessionRecord> | undefined;
+  var __inventraVoiceSessions__: Map<string, VoiceSessionRecord> | undefined;
 }
 
 const sessions =
-  globalThis.__inventornetVoiceSessions__ ??
-  (globalThis.__inventornetVoiceSessions__ = new Map<string, VoiceSessionRecord>());
+  globalThis.__inventraVoiceSessions__ ??
+  (globalThis.__inventraVoiceSessions__ = new Map<string, VoiceSessionRecord>());
 
 function now(): number {
   return Date.now();
@@ -101,7 +101,7 @@ export function createVoiceSession({ inventionId, componentId }: CreateVoiceSess
   const sessionId = randomUUID();
   const session: VoiceSessionRecord = {
     sessionId,
-    channelName: `inventornet-${sessionId}`,
+    channelName: `inventra-${sessionId}`,
     rtcUid: randomUid(),
     agentRtcUid: randomUid(),
     agentId: null,

@@ -146,7 +146,7 @@ export function buildAgoraAgentJoinPayload(
   const agentRtcToken = buildAgoraRtcToken(session.channelName, session.agentRtcUid);
 
   return {
-    name: `inventornet-agent-${session.sessionId}`,
+    name: `inventra-agent-${session.sessionId}`,
     properties: {
       channel: session.channelName,
       token: agentRtcToken,
