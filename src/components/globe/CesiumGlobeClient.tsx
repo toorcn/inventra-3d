@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import type { Invention } from "@/types";
 import { getCountryByCode } from "@/data/countries";
 import { inventions } from "@/data/inventions";
-import { getCategoryById, categoryColorMap } from "@/data/categories";
+import { categoryColorMap } from "@/data/categories";
+import { getInventionOriginLabel } from "@/lib/invention-origin";
 import type { GlobeCameraController } from "./camera-controller";
 
 interface CesiumGlobeClientProps {
@@ -23,34 +25,36 @@ const DEFAULT_VIEW = {
   height: 20000000,
 };
 
-const COUNTRY_HOVER_AREAS = [
-  {
-    code: "US",
-    name: "United States",
-    coordinates: [-124, 25, -66, 25, -66, 49, -124, 49],
-  },
-  {
-    code: "GB",
-    name: "United Kingdom",
-    coordinates: [-8.6, 49.8, 2.2, 49.8, 2.2, 59.2, -8.6, 59.2],
-  },
-  {
-    code: "IT",
-    name: "Italy",
-    coordinates: [6.4, 36.4, 19.1, 36.4, 19.1, 47.2, 6.4, 47.2],
-  },
-] as const;
+const COUNTRY_BOUNDARY_URL = "/data/countries.geojson";
 const INVENTION_FOCUS_HEIGHT = 800000;
 const COUNTRY_FOCUS_HEIGHT = 3500000;
 const REGION_FOCUS_HEIGHT = 6500000;
 const AUTO_ROTATE_RESUME_DELAY_MS = 3000;
 const INITIAL_AUTO_ROTATE_DELAY_MS = 500;
-const AUTO_ROTATE_RADIANS_PER_SECOND = 0.08;
+const AUTO_ROTATE_RADIANS_PER_SECOND = 0.015;
 
 interface GlobeViewTarget {
   lng: number;
   lat: number;
   height: number;
+}
+
+interface GeoJsonFeature {
+  type: "Feature";
+  geometry: unknown;
+  properties?: Record<string, unknown>;
+}
+
+interface GeoJsonFeatureCollection {
+  type: "FeatureCollection";
+  features: GeoJsonFeature[];
+}
+
+interface HoveredCountryState {
+  code: string;
+  name: string;
+  x: number;
+  y: number;
 }
 
 function normalizeLongitude(lng: number): number {
@@ -84,65 +88,120 @@ function getCountryNameFromEntity(entity: any): string | null {
   return getEntityStringProperty(entity, ["countryName", "ADMIN", "NAME", "NAME_LONG"]);
 }
 
-// Draw a glowing dot on a canvas and return it as an HTMLCanvasElement
-function createGlowingDotCanvas(color: string): HTMLCanvasElement {
-  const size = 32;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
+function normalizeCountryBoundaryGeoJson(
+  source: GeoJsonFeatureCollection,
+  representedCountryCodes: Set<string>,
+): GeoJsonFeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: source.features
+      .filter((feature) => {
+        const code = typeof feature.properties?.ISO_A2 === "string"
+          ? feature.properties.ISO_A2
+          : typeof feature.properties?.ISO_A2_EH === "string"
+            ? feature.properties.ISO_A2_EH
+            : null;
 
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = 8;
-
-  // Outer glow
-  const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
-  gradient.addColorStop(0, color + "cc");
-  gradient.addColorStop(0.4, color + "66");
-  gradient.addColorStop(1, color + "00");
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Core dot
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // White highlight
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.beginPath();
-  ctx.arc(cx - 2, cy - 2, radius * 0.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  return canvas;
+        return Boolean(code && representedCountryCodes.has(code) && code !== "-99");
+      })
+      .map((feature) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          countryCode: feature.properties?.countryCode ?? feature.properties?.ISO_A2 ?? feature.properties?.ISO_A2_EH,
+          countryName: feature.properties?.countryName ?? feature.properties?.ADMIN ?? feature.properties?.NAME ?? feature.properties?.NAME_LONG,
+        },
+      })),
+  };
 }
 
-function createPreviewImageDataUrl(invention: Invention): string {
-  const category = getCategoryById(invention.category);
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
-      <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="${category.color}" stop-opacity="0.95" />
-          <stop offset="100%" stop-color="#050816" stop-opacity="1" />
-        </linearGradient>
-      </defs>
-      <rect width="320" height="180" rx="24" fill="url(#bg)" />
-      <circle cx="252" cy="58" r="34" fill="rgba(255,255,255,0.16)" />
-      <circle cx="252" cy="58" r="18" fill="rgba(255,255,255,0.28)" />
-      <rect x="24" y="24" width="108" height="28" rx="14" fill="rgba(255,255,255,0.14)" />
-      <text x="78" y="43" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#F8FAFC">${category.name}</text>
-      <text x="24" y="98" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">${invention.title}</text>
-      <text x="24" y="126" font-family="Arial, sans-serif" font-size="16" fill="rgba(255,255,255,0.82)">${invention.location.label}</text>
-      <text x="24" y="148" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.66)">First seen in ${invention.year}</text>
-    </svg>
-  `;
+function createBoundaryFillMaterial(
+  Cesium: typeof import("cesium"),
+  countryCode: string,
+  highlightedCountryCodesRef: RefObject<string[]>,
+  hoveredCountryCodeRef: RefObject<string | null>,
+) {
+  return new Cesium.ColorMaterialProperty(
+    new Cesium.CallbackProperty(() => {
+      const isHovered = hoveredCountryCodeRef.current === countryCode;
+      const isHighlighted = highlightedCountryCodesRef.current.includes(countryCode);
 
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+      if (isHovered) {
+        return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.28);
+      }
+
+      if (isHighlighted) {
+        return Cesium.Color.fromCssColorString("#2563eb").withAlpha(0.16);
+      }
+
+      return Cesium.Color.fromCssColorString("#1d4ed8").withAlpha(0.02);
+    }, false),
+  );
+}
+
+function createBoundaryStrokeMaterial(
+  Cesium: typeof import("cesium"),
+  countryCode: string,
+  highlightedCountryCodesRef: RefObject<string[]>,
+  hoveredCountryCodeRef: RefObject<string | null>,
+) {
+  return new Cesium.ColorMaterialProperty(
+    new Cesium.CallbackProperty(() => {
+      const isHovered = hoveredCountryCodeRef.current === countryCode;
+      const isHighlighted = highlightedCountryCodesRef.current.includes(countryCode);
+
+      if (isHovered) {
+        return Cesium.Color.fromCssColorString("#93c5fd").withAlpha(0.95);
+      }
+
+      if (isHighlighted) {
+        return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.78);
+      }
+
+      return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.38);
+    }, false),
+  );
+}
+
+function styleBoundaryEntities(
+  Cesium: typeof import("cesium"),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  entities: any[],
+  countryCode: string,
+  highlightedCountryCodesRef: RefObject<string[]>,
+  hoveredCountryCodeRef: RefObject<string | null>,
+) {
+  const fillMaterial = createBoundaryFillMaterial(
+    Cesium,
+    countryCode,
+    highlightedCountryCodesRef,
+    hoveredCountryCodeRef,
+  );
+  const strokeMaterial = createBoundaryStrokeMaterial(
+    Cesium,
+    countryCode,
+    highlightedCountryCodesRef,
+    hoveredCountryCodeRef,
+  );
+
+  for (const entity of entities) {
+    if (entity.polygon) {
+      entity.polygon.material = fillMaterial;
+      entity.polygon.outline = true;
+      entity.polygon.outlineColor = new Cesium.CallbackProperty(
+        () => strokeMaterial.color?.getValue?.() ?? Cesium.Color.WHITE,
+        false,
+      );
+      entity.polygon.outlineWidth = 1.6;
+      entity.polygon.height = 0;
+    }
+
+    if (entity.polyline) {
+      entity.polyline.clampToGround = true;
+      entity.polyline.width = 1.6;
+      entity.polyline.material = strokeMaterial;
+    }
+  }
 }
 
 export default function CesiumGlobeClient({
@@ -167,7 +226,7 @@ export default function CesiumGlobeClient({
   const autoRotateEnabledRef = useRef(false);
   const userInteractingRef = useRef(false);
   const currentViewRef = useRef<GlobeViewTarget>(DEFAULT_VIEW);
-  const [hoveredCountry, setHoveredCountry] = useState<{ code: string; name: string } | null>(null);
+  const [hoveredCountry, setHoveredCountry] = useState<HoveredCountryState | null>(null);
 
   const clearResumeTimer = useCallback(() => {
     if (!resumeTimerRef.current) return;
@@ -393,61 +452,37 @@ export default function CesiumGlobeClient({
       v.scene.backgroundColor = Cesium.Color.fromCssColorString("#0a0a1a");
       v.scene.globe.baseColor = Cesium.Color.fromCssColorString("#111827");
 
-      COUNTRY_HOVER_AREAS.forEach((area) => {
-        const borderCoordinates = [
-          ...area.coordinates,
-          area.coordinates[0],
-          area.coordinates[1],
-        ];
+      try {
+        const response = await fetch(COUNTRY_BOUNDARY_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
 
-        v.entities.add({
-          polygon: {
-            hierarchy: Cesium.Cartesian3.fromDegreesArray([...area.coordinates]),
-            material: new Cesium.ColorMaterialProperty(
-              new Cesium.CallbackProperty(() => {
-                const isHovered = hoveredCountryCodeRef.current === area.code;
-                const isHighlighted = highlightedCountryCodesRef.current.includes(area.code);
-
-                if (isHovered) {
-                  return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.28);
-                }
-
-                if (isHighlighted) {
-                  return Cesium.Color.fromCssColorString("#2563eb").withAlpha(0.16);
-                }
-
-                return Cesium.Color.fromCssColorString("#1d4ed8").withAlpha(0.02);
-              }, false),
-            ),
-            height: 0,
-          },
-          polyline: {
-            positions: Cesium.Cartesian3.fromDegreesArray(borderCoordinates),
-            width: 1.6,
-            clampToGround: true,
-            material: new Cesium.ColorMaterialProperty(
-              new Cesium.CallbackProperty(() => {
-                const isHovered = hoveredCountryCodeRef.current === area.code;
-                const isHighlighted = highlightedCountryCodesRef.current.includes(area.code);
-
-                if (isHovered) {
-                  return Cesium.Color.fromCssColorString("#93c5fd").withAlpha(0.95);
-                }
-
-                if (isHighlighted) {
-                  return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.78);
-                }
-
-                return Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.38);
-              }, false),
-            ),
-          },
-          properties: {
-            countryCode: area.code,
-            countryName: area.name,
-          },
+        const representedCountries = new Set(inventions.map((invention) => invention.countryCode));
+        const rawGeoJson = (await response.json()) as GeoJsonFeatureCollection;
+        const geoJson = normalizeCountryBoundaryGeoJson(rawGeoJson, representedCountries);
+        const dataSource = await Cesium.GeoJsonDataSource.load(geoJson, {
+          clampToGround: true,
         });
-      });
+
+        representedCountries.forEach((countryCode) => {
+          const entities = dataSource.entities.values.filter(
+            (entity) => getCountryCodeFromEntity(entity) === countryCode,
+          );
+
+          styleBoundaryEntities(
+            Cesium,
+            entities,
+            countryCode,
+            highlightedCountryCodesRef,
+            hoveredCountryCodeRef,
+          );
+        });
+
+        await v.dataSources.add(dataSource);
+      } catch (error) {
+        console.warn("Failed to load country boundaries:", error);
+      }
 
       // Google Photorealistic 3D Tiles if key provided
       const googleKey = process.env.NEXT_PUBLIC_GOOGLE_3D_TILES_KEY;
@@ -574,11 +609,12 @@ export default function CesiumGlobeClient({
 
             if (countryCode && countryName) {
               hoveredCountryCodeRef.current = countryCode;
-              setHoveredCountry((current) =>
-                current?.code === countryCode && current.name === countryName
-                  ? current
-                  : { code: countryCode, name: countryName },
-              );
+              setHoveredCountry({
+                code: countryCode,
+                name: countryName,
+                x: movement.endPosition.x,
+                y: movement.endPosition.y,
+              });
               syncLabelVisibility();
               return;
             }
@@ -726,7 +762,6 @@ export default function CesiumGlobeClient({
       for (const inv of visible) {
         const color = categoryColorMap[inv.category] ?? "#ffffff";
         const cesiumColor = Cesium.Color.fromCssColorString(color);
-        const dotCanvas = createGlowingDotCanvas(color);
         const isSelected = inv.id === selectedInventionId;
 
         const position = Cesium.Cartesian3.fromDegrees(
@@ -739,23 +774,26 @@ export default function CesiumGlobeClient({
         v.entities.add({
           position,
           billboard: {
-            image: dotCanvas,
-            width: isSelected ? 40 : 32,
-            height: isSelected ? 40 : 32,
-            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            image: inv.imageSrc,
+            width: isSelected ? 132 : 112,
+            height: isSelected ? 96 : 80,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
             horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            pixelOffset: new Cesium.Cartesian2(0, -8),
+            scaleByDistance: new Cesium.NearFarScalar(1500000, 1, 22000000, 0.56),
+            translucencyByDistance: new Cesium.NearFarScalar(1500000, 1, 22000000, 0.86),
           },
           label: {
-            text: `${inv.title} (${inv.year})`,
+            text: `${inv.title}\n${getInventionOriginLabel(inv)}`,
             font: "12px sans-serif",
             fillColor: isSelected ? cesiumColor.brighten(0.3, new Cesium.Color()) : Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -40),
+            pixelOffset: new Cesium.Cartesian2(0, -104),
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
             show: isSelected,
           },
@@ -805,46 +843,22 @@ export default function CesiumGlobeClient({
       />
 
       {hoveredCountry ? (
-        <div className="pointer-events-none absolute left-6 top-24 z-10 w-80 rounded-2xl border border-white/12 bg-[#08101d]/86 p-4 shadow-2xl shadow-black/35 backdrop-blur-xl">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-blue-200/55">
-                Hover Preview
-              </p>
-              <h3 className="text-lg font-semibold text-white">{hoveredCountry.name}</h3>
-            </div>
-            <div className="rounded-full border border-blue-400/20 bg-blue-500/10 px-2.5 py-1 text-[11px] font-medium text-blue-100/80">
+        <div
+          className="pointer-events-none absolute z-10 rounded-2xl border border-white/12 bg-[#08101d]/90 px-3 py-2 shadow-2xl shadow-black/35 backdrop-blur-xl"
+          style={{
+            left: hoveredCountry.x + 20,
+            top: Math.max(24, hoveredCountry.y - 18),
+          }}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-blue-200/55">
+            Country
+          </p>
+          <div className="mt-1 flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-white">{hoveredCountry.name}</h3>
+            <span className="rounded-full border border-blue-400/20 bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-100/80">
               {hoveredCountryInventions.length} invention{hoveredCountryInventions.length === 1 ? "" : "s"}
-            </div>
+            </span>
           </div>
-
-          {hoveredCountryInventions.length > 0 ? (
-            <div className="space-y-3">
-              {hoveredCountryInventions.slice(0, 3).map((invention) => (
-                <div
-                  key={invention.id}
-                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
-                >
-                  <img
-                    src={createPreviewImageDataUrl(invention)}
-                    alt={`${invention.title} preview`}
-                    className="h-28 w-full object-cover"
-                  />
-                  <div className="px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-white">{invention.title}</p>
-                      <span className="text-xs text-white/55">{invention.year}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-white/62">{invention.location.label}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-white/55">
-              No tracked inventions are mapped here in the current timeline yet.
-            </div>
-          )}
         </div>
       ) : null}
     </div>

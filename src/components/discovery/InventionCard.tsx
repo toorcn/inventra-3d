@@ -1,6 +1,7 @@
 "use client";
 
 import { getCategoryById } from "@/data/categories";
+import { getInventionOriginLabel } from "@/lib/invention-origin";
 import type { Invention } from "@/types";
 import { Box, ChevronRight } from "lucide-react";
 
@@ -50,7 +51,7 @@ export function InventionCard({ invention, isSelected, onClick }: InventionCardP
         <div className="mt-1 flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-medium tabular-nums text-white/35">{invention.year}</span>
           <span className="text-white/15">·</span>
-          <span className="truncate text-[11px] text-white/35">{invention.location.label}</span>
+          <span className="truncate text-[11px] text-white/35">{getInventionOriginLabel(invention)}</span>
           <span className="text-white/15">·</span>
           <span
             className="text-[10px] font-bold uppercase tracking-wide"

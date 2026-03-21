@@ -4,34 +4,48 @@ import { searchInventions } from "@/lib/exa-search";
 import { NextRequest, NextResponse } from "next/server";
 
 type ExaSearchResult = {
-  inventionId: "telephone" | "iphone" | "steam-engine" | "telescope" | null;
+  inventionId: string | null;
   lat: number;
   lng: number;
   regionName: string;
 };
 
-const KNOWN_INVENTIONS = [
-  { id: "telephone", year: 1876, city: "Boston", lat: 42.3601, lng: -71.0589 },
-  { id: "iphone", year: 2007, city: "Cupertino", lat: 37.3318, lng: -122.0312 },
-  { id: "steam-engine", year: 1769, city: "Birmingham", lat: 52.4862, lng: -1.8904 },
-  { id: "telescope", year: 1609, city: "Padua", lat: 45.4064, lng: 11.8768 },
-];
-
 function localFallback(query: string): ExaSearchResult {
   const q = query.toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  let bestMatch: ExaSearchResult | null = null;
+  let bestScore = 0;
+
   for (const inv of inventions) {
-    const searchable = `${inv.title} ${inv.description} ${inv.country}`.toLowerCase();
-    if (searchable.includes(q) || q.includes(inv.title.toLowerCase())) {
-      const known = KNOWN_INVENTIONS.find((k) => k.id === inv.id);
-      return {
-        inventionId: inv.id as ExaSearchResult["inventionId"],
-        lat: known?.lat ?? inv.location.lat,
-        lng: known?.lng ?? inv.location.lng,
+    const searchable = [
+      inv.title,
+      inv.description,
+      inv.country,
+      inv.stateOrProvince,
+      inv.patentNumber,
+      inv.inventors.join(" "),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    const score = terms.reduce((total, term) => total + (searchable.includes(term) ? 1 : 0), 0);
+    const boostedScore = searchable.includes(q) || q.includes(inv.title.toLowerCase())
+      ? score + 4
+      : score;
+
+    if (boostedScore > bestScore) {
+      bestScore = boostedScore;
+      bestMatch = {
+        inventionId: inv.id,
+        lat: inv.location.lat,
+        lng: inv.location.lng,
         regionName: inv.location.label,
       };
     }
   }
-  return { inventionId: null, lat: 0, lng: 0, regionName: "" };
+
+  return bestMatch ?? { inventionId: null, lat: 0, lng: 0, regionName: "" };
 }
 
 export async function POST(req: NextRequest) {
@@ -55,14 +69,14 @@ export async function POST(req: NextRequest) {
     const context = exaResults
       .map((r, i) => `Result ${i + 1}: ${r.title ?? ""} — ${r.url}`)
       .join("\n");
+    const knownInventions = inventions
+      .map((inv) => `- ${inv.id} (${inv.year}, ${inv.location.label}, ${inv.country}) — lat: ${inv.location.lat}, lng: ${inv.location.lng}`)
+      .join("\n");
 
     const prompt = `You are helping identify which of our known inventions best matches a search query.
 
 Known inventions:
-- telephone (1876, Boston, USA) — lat: 42.3601, lng: -71.0589
-- iphone (2007, Cupertino, USA) — lat: 37.3318, lng: -122.0312
-- steam-engine (1769, Birmingham, UK) — lat: 52.4862, lng: -1.8904
-- telescope (1609, Padua, Italy) — lat: 45.4064, lng: 11.8768
+${knownInventions}
 
 User query: "${query}"
 
@@ -71,7 +85,7 @@ ${context}
 
 Based on the query and Exa results, identify which invention (if any) is the best match.
 Respond with ONLY valid JSON in this exact format:
-{ "inventionId": "telephone"|"iphone"|"steam-engine"|"telescope"|null, "lat": <number>, "lng": <number>, "regionName": "<string>" }
+{ "inventionId": "<known invention id>"|null, "lat": <number>, "lng": <number>, "regionName": "<string>" }
 
 If none of the known inventions match, set inventionId to null and lat/lng to 0.`;
 

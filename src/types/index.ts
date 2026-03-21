@@ -2,14 +2,27 @@ export type CategoryId =
   | "communications"
   | "optics"
   | "mechanical"
-  | "consumer-electronics";
+  | "consumer-electronics"
+  | "transportation"
+  | "medicine"
+  | "computing"
+  | "materials";
+
+export type InventionImageStyle = "drawing" | "photo";
+export type InventionImageType = "patent" | "archival" | "photo";
+
+export interface InventionLocation {
+  lat: number;
+  lng: number;
+  label: string;
+}
 
 export interface Invention {
   id: string;
   title: string;
   year: number;
   inventors: string[];
-  location: { lat: number; lng: number; label: string };
+  location: InventionLocation;
   country: string;
   countryCode: string;
   category: CategoryId;
@@ -19,6 +32,14 @@ export interface Invention {
   inventionDate: number;
   patentDate: number | null;
   commercialisationDate: number;
+  imageSrc: string;
+  imageAlt: string;
+  imageStyle: InventionImageStyle;
+  imageType: InventionImageType;
+  imageSourceUrl: string;
+  imageCredit?: string;
+  sourceUrl: string;
+  stateOrProvince?: string;
   avatarPersona: string;
   avatarVoiceStyle: string;
 }

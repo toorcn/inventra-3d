@@ -7,6 +7,10 @@ const CATEGORY_KEYWORDS: Record<CategoryId, string[]> = {
   optics: ["optics", "telescope", "lens", "light", "microscope", "vision"],
   mechanical: ["mechanical", "engine", "steam", "gear", "machine", "piston"],
   "consumer-electronics": ["electronics", "iphone", "smartphone", "device", "mobile", "gadget"],
+  transportation: ["transportation", "airplane", "flight", "aviation", "jet", "vehicle"],
+  medicine: ["medicine", "medical", "vaccine", "scanner", "hospital", "diagnostic"],
+  computing: ["computing", "computer", "chip", "transistor", "web", "code", "digital"],
+  materials: ["materials", "paper", "fabric", "zipper", "dynamite", "manufacturing"],
 };
 
 const REGIONS = ["Europe", "Asia", "North America", "South America", "Africa", "Oceania"];
@@ -83,28 +87,6 @@ export async function parseSearchQuery(query: string): Promise<SearchFilters> {
   }
 
   try {
-    const schema = {
-      type: "object",
-      properties: {
-        categories: {
-          type: "array",
-          items: {
-            type: "string",
-            enum: ["communications", "optics", "mechanical", "consumer-electronics"],
-          },
-        },
-        region: { type: "string" },
-        yearRange: {
-          type: "array",
-          items: { type: "number" },
-          minItems: 2,
-          maxItems: 2,
-        },
-        country: { type: "string" },
-      },
-      additionalProperties: false,
-    };
-
     const parsed = await structuredOutput<SearchFilters>(
       [
         {
@@ -114,7 +96,36 @@ export async function parseSearchQuery(query: string): Promise<SearchFilters> {
         },
         { role: "user", content: normalized },
       ],
-      schema,
+      {
+        type: "object",
+        properties: {
+          categories: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: [
+                "communications",
+                "optics",
+                "mechanical",
+                "consumer-electronics",
+                "transportation",
+                "medicine",
+                "computing",
+                "materials",
+              ],
+            },
+          },
+          region: { type: "string" },
+          yearRange: {
+            type: "array",
+            items: { type: "number" },
+            minItems: 2,
+            maxItems: 2,
+          },
+          country: { type: "string" },
+        },
+        additionalProperties: false,
+      },
     );
 
     return { ...parsed, query: normalized };

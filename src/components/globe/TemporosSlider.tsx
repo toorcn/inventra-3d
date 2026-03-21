@@ -6,6 +6,7 @@ import { inventions } from "@/data/inventions";
 interface TemporosSliderProps {
   year: number;
   onYearChange: (year: number) => void;
+  className?: string;
 }
 
 const MIN_YEAR = 1600;
@@ -24,7 +25,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export default function TemporosSlider({ year, onYearChange }: TemporosSliderProps) {
+export default function TemporosSlider({ year, onYearChange, className = "" }: TemporosSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [ripples, setRipples] = useState<{ id: string; title: string }[]>([]);
@@ -89,9 +90,7 @@ export default function TemporosSlider({ year, onYearChange }: TemporosSliderPro
 
   return (
     <div
-      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[80%] max-w-3xl
-                 bg-black/70 backdrop-blur-md rounded-2xl border border-white/10
-                 px-6 py-4 select-none"
+      className={`z-20 w-full max-w-3xl bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 px-6 py-4 select-none ${className}`}
     >
       {/* Header row */}
       <div className="flex items-center justify-between mb-3">

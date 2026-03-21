@@ -270,7 +270,14 @@ export default function Home() {
               highlightedCountryCodes={highlightedCountryCodes}
               temporosYear={temporosYear}
             />
-            <TemporosSlider year={temporosYear} onYearChange={setTemporosYear} />
+            {/* Overlay for Slider — centered in the padded area */}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end pb-12 pr-[26rem]">
+              <TemporosSlider
+                year={temporosYear}
+                onYearChange={setTemporosYear}
+                className="pointer-events-auto shadow-2xl shadow-black/50 mb-0"
+              />
+            </div>
           </div>
 
           <div className="pointer-events-none absolute right-4 top-4 z-20 h-[calc(100vh-2rem)]">

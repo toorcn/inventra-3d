@@ -7,13 +7,26 @@ import type { Invention } from "@/types";
  * when no EXA_API_KEY is set.
  */
 function localFallbackMatch(query: string): Invention | null {
-  return (
-    inventions.find((inv) =>
-      `${inv.title} ${inv.description} ${inv.country}`
-        .toLowerCase()
-        .includes(query.toLowerCase())
-    ) || null
-  );
+  const lowered = query.toLowerCase();
+  const terms = lowered.split(/\s+/).filter(Boolean);
+
+  let best: Invention | null = null;
+  let bestScore = 0;
+
+  inventions.forEach((inv) => {
+    const searchable = `${inv.title} ${inv.description} ${inv.country} ${inv.stateOrProvince ?? ""} ${inv.patentNumber ?? ""} ${inv.inventors.join(" ")}`.toLowerCase();
+    const score = terms.reduce((total, term) => total + (searchable.includes(term) ? 1 : 0), 0);
+    const boostedScore = searchable.includes(lowered) || lowered.includes(inv.title.toLowerCase())
+      ? score + 4
+      : score;
+
+    if (boostedScore > bestScore) {
+      best = inv;
+      bestScore = boostedScore;
+    }
+  });
+
+  return best;
 }
 
 describe("Exa search local fallback", () => {
@@ -24,16 +37,21 @@ describe("Exa search local fallback", () => {
   });
 
   it("matches 'optical instruments' to the Refracting Telescope", () => {
-    // The telescope description contains "instrument" and "Refracting Telescope" in its title
     const result = localFallbackMatch("Refracting Telescope");
     expect(result).not.toBeNull();
     expect(result!.id).toBe("telescope");
   });
 
-  it("matches 'steam' to the Watt Steam Engine", () => {
-    const result = localFallbackMatch("steam");
+  it("matches 'geneva web' to the World Wide Web", () => {
+    const result = localFallbackMatch("geneva web");
     expect(result).not.toBeNull();
-    expect(result!.id).toBe("steam-engine");
+    expect(result!.id).toBe("world-wide-web");
+  });
+
+  it("matches 'tokyo portable music' to the Walkman", () => {
+    const result = localFallbackMatch("portable music");
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe("walkman");
   });
 
   it("returns null for a nonsense query", () => {

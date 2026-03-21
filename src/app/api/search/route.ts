@@ -3,12 +3,12 @@ import { parseSearchQuery } from "@/lib/search-parser";
 import type { Invention, SearchFilters } from "@/types";
 
 const REGION_TO_COUNTRIES: Record<string, string[]> = {
-  europe: ["GB", "DE", "CH", "SE", "IT"],
+  europe: ["GB", "DE", "CH", "SE", "IT", "FR"],
   asia: ["CN", "JP"],
   "north america": ["US"],
-  "south america": [],
+  "south america": ["AR"],
   africa: [],
-  oceania: [],
+  oceania: ["AU"],
 };
 
 function applyFilters(dataset: Invention[], filters: SearchFilters): Invention[] {
@@ -36,7 +36,18 @@ function applyFilters(dataset: Invention[], filters: SearchFilters): Invention[]
     }
 
     if (filters.query) {
-      const haystack = `${invention.title} ${invention.description} ${invention.country} ${invention.category}`.toLowerCase();
+      const haystack = [
+        invention.title,
+        invention.description,
+        invention.country,
+        invention.stateOrProvince,
+        invention.category,
+        invention.patentNumber,
+        invention.inventors.join(" "),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       const terms = filters.query.toLowerCase().split(/\s+/).filter(Boolean);
       if (terms.length && !terms.some((term) => haystack.includes(term))) {
         return false;

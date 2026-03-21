@@ -1,8 +1,9 @@
 "use client";
 
 import { Badge } from "@/components/ui/Badge";
+import { getInventionOriginLabel } from "@/lib/invention-origin";
 import type { Invention } from "@/types";
-import { ArrowLeft, Box, Calendar, MapPin, User, FileText } from "lucide-react";
+import { ArrowLeft, Box, Calendar, ExternalLink, MapPin, User, FileText } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
@@ -35,6 +36,31 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto p-4 py-6">
+        <div className="mb-8 overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] shadow-2xl shadow-black/20">
+          <img
+            src={invention.imageSrc}
+            alt={invention.imageAlt}
+            className="h-56 w-full object-cover sm:h-64"
+          />
+          <div className="flex items-center justify-between gap-3 border-t border-white/8 px-4 py-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">
+                Image Source
+              </p>
+              <p className="text-sm text-white/70">{getInventionOriginLabel(invention)}</p>
+            </div>
+            <a
+              href={invention.imageSourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:text-white hover:bg-white/[0.08]"
+            >
+              View Image Source
+              <ExternalLink className="size-3.5" />
+            </a>
+          </div>
+        </div>
+
         {/* Quick info grid */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 shadow-sm transition-colors hover:bg-white/[0.04]">
@@ -48,7 +74,7 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
             <MapPin className="size-4 text-blue-400" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Origin</p>
-              <p className="text-sm font-semibold text-white truncate">{invention.location.label}</p>
+              <p className="text-sm font-semibold text-white truncate">{getInventionOriginLabel(invention)}</p>
             </div>
           </div>
         </div>
@@ -106,7 +132,7 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
 
       {/* Footer action section */}
       <div className="border-t border-white/5 bg-white/[0.04] p-4 backdrop-blur-md">
-        {onEnterViewer ? (
+        {onEnterViewer && invention.hasModel ? (
           <button
             onClick={() => onEnterViewer(invention)}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
@@ -119,18 +145,24 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
             Enter Holographic Viewer
           </button>
         ) : (
-          <Link href={`/invention/${invention.id}`}>
-            <button
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              style={{
-                background: "linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)",
-                boxShadow: "0 0 20px -5px #2563EB88",
-              }}
-            >
-              <Box className="size-5" />
-              Enter Holographic Viewer
-            </button>
-          </Link>
+          invention.hasModel ? (
+            <Link href={`/invention/${invention.id}`}>
+              <button
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  background: "linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)",
+                  boxShadow: "0 0 20px -5px #2563EB88",
+                }}
+              >
+                <Box className="size-5" />
+                Enter Holographic Viewer
+              </button>
+            </Link>
+          ) : (
+            <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-4 text-center text-sm text-white/55">
+              This entry is available on the globe and in discovery, but it does not have a holographic 3D model yet.
+            </div>
+          )
         )}
       </div>
     </div>
