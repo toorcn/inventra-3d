@@ -2,13 +2,16 @@
 
 import type { GestureRecognizer } from "@mediapipe/tasks-vision";
 import {
+  GESTURE_CONTINUOUS_GRACE_FRAME_COUNT,
   DEFAULT_GESTURE_FRAME_STATE,
   GESTURE_FRAME_INTERVAL_MS,
+  GESTURE_MIN_CONFIDENCE,
   advanceGestureFrame,
   getDominantGesture,
+  getHandBounds,
   getPalmCenter,
 } from "@/lib/gesture-controls";
-import type { GestureControlStatus } from "@/types";
+import type { GestureControlStatus, GestureDebugFrame } from "@/types";
 import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
@@ -20,6 +23,7 @@ interface UseGestureControlsOptions {
 }
 
 interface UseGestureControlsReturn {
+  debugFrame: GestureDebugFrame | null;
   error: string | null;
   status: GestureControlStatus;
   videoRef: MutableRefObject<HTMLVideoElement | null>;
@@ -95,6 +99,7 @@ export function useGestureControls({
   const restoreConsoleErrorRef = useRef<(() => void) | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [debugFrame, setDebugFrame] = useState<GestureDebugFrame | null>(null);
   const [status, setStatus] = useState<GestureControlStatus>("idle");
 
   useEffect(() => {
@@ -155,6 +160,7 @@ export function useGestureControls({
       lastInferenceAtRef.current = 0;
       lastVideoTimeRef.current = -1;
       restoreConsoleErrorRef.current?.();
+      setDebugFrame(null);
       setStatus(nextStatus);
     };
 
@@ -199,7 +205,9 @@ export function useGestureControls({
         if (shouldInfer) {
           const result = recognizerRef.current.recognizeForVideo(video, now);
           const topGesture = getDominantGesture(result.gestures[0]);
-          const palmCenter = getPalmCenter(result.landmarks[0]);
+          const landmarks = result.landmarks[0];
+          const palmCenter = getPalmCenter(landmarks);
+          const bounds = getHandBounds(landmarks);
           const frame = advanceGestureFrame(frameStateRef.current, {
             gestureName: topGesture?.name ?? null,
             gestureScore: topGesture?.score ?? 0,
@@ -210,6 +218,26 @@ export function useGestureControls({
           frameStateRef.current = frame.state;
           lastInferenceAtRef.current = now;
           lastVideoTimeRef.current = video.currentTime;
+          const isConfidentOpenPalm =
+            topGesture?.name === "Open_Palm" &&
+            (topGesture?.score ?? 0) >= GESTURE_MIN_CONFIDENCE;
+          const isWithinGraceWindow =
+            frame.state.currentGestureName === "Open_Palm" && !isConfidentOpenPalm;
+          setDebugFrame({
+            bounds,
+            confidence: topGesture?.score ?? 0,
+            graceFramesRemaining:
+              isWithinGraceWindow
+                ? Math.max(
+                    0,
+                    GESTURE_CONTINUOUS_GRACE_FRAME_COUNT - frame.state.missedFrames,
+                  )
+                : 0,
+            isStable: frame.stableGestureName === "Open_Palm",
+            isWithinGraceWindow,
+            palmCenter,
+            gestureName: topGesture?.name ?? frame.state.currentGestureName,
+          });
 
           if (frame.command === "explode") {
             onExplodeRef.current();
@@ -325,6 +353,7 @@ export function useGestureControls({
   }, [enabled]);
 
   return {
+    debugFrame,
     error,
     status,
     videoRef,

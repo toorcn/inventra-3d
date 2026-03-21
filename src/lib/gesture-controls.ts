@@ -1,7 +1,8 @@
-import type { ViewerTransform } from "@/types";
+import type { GestureDebugBounds, ViewerTransform } from "@/types";
 
 export const GESTURE_MIN_CONFIDENCE = 0.7;
 export const GESTURE_STABLE_FRAME_COUNT = 3;
+export const GESTURE_CONTINUOUS_GRACE_FRAME_COUNT = 2;
 export const GESTURE_COMMAND_COOLDOWN_MS = 1200;
 export const GESTURE_FRAME_INTERVAL_MS = Math.round(1000 / 12);
 export const VIEWER_ROTATION_SMOOTHING = 0.35;
@@ -35,6 +36,7 @@ export interface GestureFrameInput {
 export interface GestureFrameState {
   currentGestureName: string | null;
   consecutiveFrames: number;
+  missedFrames: number;
   previousPalmCenter: PalmPoint | null;
   lastCommandAt: number | null;
   discreteGestureConsumed: boolean;
@@ -50,6 +52,7 @@ export interface GestureFrameOutput {
 export const DEFAULT_GESTURE_FRAME_STATE: GestureFrameState = {
   currentGestureName: null,
   consecutiveFrames: 0,
+  missedFrames: 0,
   previousPalmCenter: null,
   lastCommandAt: null,
   discreteGestureConsumed: false,
@@ -112,27 +115,68 @@ export function getPalmCenter(
   };
 }
 
+export function getHandBounds(
+  landmarks: Array<{ x: number; y: number }> | null | undefined,
+): GestureDebugBounds | null {
+  if (!landmarks || landmarks.length === 0) return null;
+
+  const firstPoint = landmarks[0];
+  if (!firstPoint) return null;
+
+  return landmarks.reduce<GestureDebugBounds>(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxX: Math.max(bounds.maxX, point.x),
+      maxY: Math.max(bounds.maxY, point.y),
+    }),
+    {
+      minX: firstPoint.x,
+      minY: firstPoint.y,
+      maxX: firstPoint.x,
+      maxY: firstPoint.y,
+    },
+  );
+}
+
 export function advanceGestureFrame(
   state: GestureFrameState,
   input: GestureFrameInput,
   options?: {
     cooldownMs?: number;
+    continuousGraceFrameCount?: number;
     minConfidence?: number;
     stableFrameCount?: number;
   },
 ): GestureFrameOutput {
   const cooldownMs = options?.cooldownMs ?? GESTURE_COMMAND_COOLDOWN_MS;
+  const continuousGraceFrameCount =
+    options?.continuousGraceFrameCount ?? GESTURE_CONTINUOUS_GRACE_FRAME_COUNT;
   const minConfidence = options?.minConfidence ?? GESTURE_MIN_CONFIDENCE;
   const stableFrameCount = options?.stableFrameCount ?? GESTURE_STABLE_FRAME_COUNT;
 
   const isConfident =
     Boolean(input.gestureName) && input.gestureScore >= minConfidence;
-  const nextGestureName = isConfident ? input.gestureName : null;
+  const withinOpenPalmGraceWindow =
+    !isConfident &&
+    state.currentGestureName === "Open_Palm" &&
+    state.missedFrames < continuousGraceFrameCount;
+  const nextGestureName = isConfident
+    ? input.gestureName
+    : withinOpenPalmGraceWindow
+      ? state.currentGestureName
+      : null;
   const nextConsecutiveFrames =
     nextGestureName && nextGestureName === state.currentGestureName
       ? state.consecutiveFrames + 1
       : nextGestureName
         ? 1
+        : 0;
+  const nextMissedFrames =
+    isConfident
+      ? 0
+      : nextGestureName === "Open_Palm"
+        ? state.missedFrames + 1
         : 0;
 
   const stableGestureName =
@@ -143,7 +187,11 @@ export function advanceGestureFrame(
   const nextState: GestureFrameState = {
     currentGestureName: nextGestureName,
     consecutiveFrames: nextConsecutiveFrames,
-    previousPalmCenter: stableGestureName === "Open_Palm" ? input.palmCenter : null,
+    missedFrames: nextMissedFrames,
+    previousPalmCenter:
+      stableGestureName === "Open_Palm"
+        ? input.palmCenter ?? state.previousPalmCenter
+        : null,
     lastCommandAt: state.lastCommandAt,
     discreteGestureConsumed:
       nextGestureName === state.currentGestureName

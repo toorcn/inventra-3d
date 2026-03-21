@@ -75,6 +75,97 @@ describe("gesture-controls", () => {
     expect(fourthFrame.rotationDelta?.y).toBeCloseTo(0.06, 5);
   });
 
+  it("keeps open palm tracking active through brief recognition dropouts", () => {
+    let state = DEFAULT_GESTURE_FRAME_STATE;
+
+    state = advanceGestureFrame(state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.2, y: 0.3 },
+      timestampMs: 0,
+    }).state;
+    state = advanceGestureFrame(state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.22, y: 0.31 },
+      timestampMs: 80,
+    }).state;
+    state = advanceGestureFrame(state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.24, y: 0.34 },
+      timestampMs: 160,
+    }).state;
+
+    const missedFrame = advanceGestureFrame(state, {
+      gestureName: null,
+      gestureScore: 0,
+      palmCenter: null,
+      timestampMs: 240,
+    });
+
+    expect(missedFrame.stableGestureName).toBe("Open_Palm");
+    expect(missedFrame.state.currentGestureName).toBe("Open_Palm");
+    expect(missedFrame.state.previousPalmCenter).toEqual({ x: 0.24, y: 0.34 });
+
+    const recoveredFrame = advanceGestureFrame(missedFrame.state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.29, y: 0.4 },
+      timestampMs: 320,
+    });
+
+    expect(recoveredFrame.rotationDelta?.x).toBeCloseTo(0.05, 5);
+    expect(recoveredFrame.rotationDelta?.y).toBeCloseTo(0.06, 5);
+  });
+
+  it("resets open palm tracking after the grace window is exceeded", () => {
+    let state = DEFAULT_GESTURE_FRAME_STATE;
+
+    state = advanceGestureFrame(state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.2, y: 0.3 },
+      timestampMs: 0,
+    }).state;
+    state = advanceGestureFrame(state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.22, y: 0.31 },
+      timestampMs: 80,
+    }).state;
+    state = advanceGestureFrame(state, {
+      gestureName: "Open_Palm",
+      gestureScore: 0.92,
+      palmCenter: { x: 0.24, y: 0.34 },
+      timestampMs: 160,
+    }).state;
+
+    state = advanceGestureFrame(state, {
+      gestureName: null,
+      gestureScore: 0,
+      palmCenter: null,
+      timestampMs: 240,
+    }).state;
+    state = advanceGestureFrame(state, {
+      gestureName: null,
+      gestureScore: 0,
+      palmCenter: null,
+      timestampMs: 320,
+    }).state;
+
+    const expiredFrame = advanceGestureFrame(state, {
+      gestureName: null,
+      gestureScore: 0,
+      palmCenter: null,
+      timestampMs: 400,
+    });
+
+    expect(expiredFrame.stableGestureName).toBeNull();
+    expect(expiredFrame.state.currentGestureName).toBeNull();
+    expect(expiredFrame.state.previousPalmCenter).toBeNull();
+  });
+
   it("enforces one discrete command per gesture streak and cooldown window", () => {
     let state = DEFAULT_GESTURE_FRAME_STATE;
 

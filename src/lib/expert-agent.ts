@@ -1,5 +1,5 @@
 import { getComponentsByInventionId } from "@/data/invention-components";
-import type { Invention, InventionComponent } from "@/types";
+import type { Invention, InventionComponent, ViewerState } from "@/types";
 import type { ExpertAction } from "@/types";
 import { chatCompletion, hasOpenRouterApiKey, structuredOutput, type OpenRouterMessage } from "./openrouter";
 
@@ -56,7 +56,7 @@ export interface ExpertAgentResult {
   actions: ExpertAction[];
 }
 
-export function buildToolInstructions(invention: Invention, component?: InventionComponent): string {
+export function buildToolInstructions(invention: Invention, component?: InventionComponent, viewerState?: ViewerState): string {
   const components = getComponentsByInventionId(invention.id);
   const lines = [
     `You are an expert historian and engineer explaining the ${invention.title}.`,
@@ -94,6 +94,18 @@ export function buildToolInstructions(invention: Invention, component?: Inventio
     lines.push("Tool: emit_beam { fromComponentId, toComponentId, durationMs?, color?, thickness? }");
   } else {
     lines.push("No viewer tools are available for this invention because there is no 3D model.");
+  }
+
+  if (viewerState) {
+    const stateParts: string[] = [];
+    stateParts.push(viewerState.isExploded ? "model is exploded" : "model is assembled");
+    if (viewerState.highlightedComponentIds.length > 0) {
+      const names = viewerState.highlightedComponentIds
+        .map((id) => components.find((c) => c.id === id)?.name ?? id)
+        .join(", ");
+      stateParts.push(`highlighted: ${names}`);
+    }
+    lines.push(`Current viewer state: ${stateParts.join(", ")}`);
   }
 
   return lines.join("\n");
@@ -236,8 +248,9 @@ export async function runExpertAgent(
   invention: Invention,
   messages: OpenRouterMessage[],
   component?: InventionComponent,
+  viewerState?: ViewerState,
 ): Promise<ExpertAgentResult> {
-  const systemPrompt = buildToolInstructions(invention, component);
+  const systemPrompt = buildToolInstructions(invention, component, viewerState);
 
   if (!hasOpenRouterApiKey()) {
     const content = await chatCompletion([

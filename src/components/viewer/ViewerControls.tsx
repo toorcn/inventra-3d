@@ -1,10 +1,11 @@
 "use client";
 
-import type { GestureControlStatus } from "@/types";
+import type { GestureControlStatus, GestureDebugFrame } from "@/types";
 import { Expand, Hand, Minimize2, RotateCcw } from "lucide-react";
 import type { MutableRefObject } from "react";
 
 interface ViewerControlsProps {
+  gestureDebugFrame?: GestureDebugFrame | null;
   gestureEnabled: boolean;
   gestureError: string | null;
   gestureStatus: GestureControlStatus;
@@ -33,7 +34,21 @@ const STATUS_STYLES: Record<GestureControlStatus, string> = {
   unsupported: "border-orange-400/30 bg-orange-500/15 text-orange-100",
 };
 
+function formatGestureLabel(name: string | null) {
+  if (!name) return "No gesture";
+
+  return name
+    .split("_")
+    .map((part) => part[0]?.toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function clampToPercent(value: number) {
+  return Math.max(0, Math.min(100, value * 100));
+}
+
 export function ViewerControls({
+  gestureDebugFrame,
   gestureEnabled,
   gestureError,
   gestureStatus,
@@ -62,13 +77,64 @@ export function ViewerControls({
           </div>
 
           <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
-            <video
-              ref={gestureVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="aspect-video w-full scale-x-[-1] object-cover"
-            />
+            <div className="relative aspect-video w-full">
+              <video
+                ref={gestureVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full scale-x-[-1] object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 scale-x-[-1]">
+                {gestureDebugFrame?.bounds ? (
+                  <div
+                    className="absolute rounded-lg border-2 border-cyan-300/90 shadow-[0_0_0_1px_rgba(103,232,249,0.2)]"
+                    style={{
+                      left: `${clampToPercent(gestureDebugFrame.bounds.minX)}%`,
+                      top: `${clampToPercent(gestureDebugFrame.bounds.minY)}%`,
+                      width: `${clampToPercent(
+                        gestureDebugFrame.bounds.maxX - gestureDebugFrame.bounds.minX,
+                      )}%`,
+                      height: `${clampToPercent(
+                        gestureDebugFrame.bounds.maxY - gestureDebugFrame.bounds.minY,
+                      )}%`,
+                    }}
+                  />
+                ) : null}
+                {gestureDebugFrame?.palmCenter ? (
+                  <div
+                    className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-100 bg-cyan-400 shadow-[0_0_16px_rgba(34,211,238,0.8)]"
+                    style={{
+                      left: `${clampToPercent(gestureDebugFrame.palmCenter.x)}%`,
+                      top: `${clampToPercent(gestureDebugFrame.palmCenter.y)}%`,
+                    }}
+                  />
+                ) : null}
+              </div>
+              <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
+                <span className="rounded-full border border-white/10 bg-black/55 px-2 py-1 text-[10px] font-medium text-white">
+                  {formatGestureLabel(gestureDebugFrame?.gestureName ?? null)}
+                  {gestureDebugFrame?.confidence
+                    ? ` ${Math.round(gestureDebugFrame.confidence * 100)}%`
+                    : ""}
+                </span>
+                <span
+                  className={`w-fit rounded-full border px-2 py-1 text-[10px] font-medium ${
+                    gestureDebugFrame?.isStable
+                      ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100"
+                      : gestureDebugFrame?.isWithinGraceWindow
+                        ? "border-amber-400/30 bg-amber-500/15 text-amber-100"
+                        : "border-white/10 bg-black/55 text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {gestureDebugFrame?.isStable
+                    ? "Stable"
+                    : gestureDebugFrame?.isWithinGraceWindow
+                      ? `Grace ${gestureDebugFrame.graceFramesRemaining}`
+                      : "Searching"}
+                </span>
+              </div>
+            </div>
           </div>
 
           {gestureError ? (

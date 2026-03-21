@@ -236,6 +236,23 @@ export type GestureControlStatus =
   | "unsupported"
   | "error";
 
+export interface GestureDebugBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface GestureDebugFrame {
+  bounds: GestureDebugBounds | null;
+  confidence: number;
+  graceFramesRemaining: number;
+  isStable: boolean;
+  isWithinGraceWindow: boolean;
+  palmCenter: { x: number; y: number } | null;
+  gestureName: string | null;
+}
+
 export interface ExplodedViewState {
   isExploded: boolean;
   selectedComponentId: string | null;

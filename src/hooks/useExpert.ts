@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 interface UseExpertProps {
   inventionId: string;
   componentId?: string | null;
+  viewerState?: ViewerState | null;
   activeVoiceSessionId?: string | null;
   onActions?: (actions: ExpertAction[]) => void;
 }
@@ -62,7 +63,7 @@ function buildSuggestedQuestions(inventionId: string, componentId?: string | nul
   return base;
 }
 
-export function useExpert({ inventionId, componentId, activeVoiceSessionId, onActions }: UseExpertProps) {
+export function useExpert({ inventionId, componentId, viewerState, activeVoiceSessionId, onActions }: UseExpertProps) {
   const invention = getInventionById(inventionId);
   const introMessage: ChatMessage = useMemo(() => createIntroMessage(invention), [invention]);
   const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
@@ -135,6 +136,7 @@ export function useExpert({ inventionId, componentId, activeVoiceSessionId, onAc
           body: JSON.stringify({
             inventionId,
             componentId: componentId ?? null,
+            viewerState: viewerState ?? null,
             messages: conversation,
             sessionId: activeVoiceSessionId ?? undefined,
             clientMessageId: userMsg.id,

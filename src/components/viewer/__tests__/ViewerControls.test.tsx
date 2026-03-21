@@ -11,6 +11,7 @@ describe("ViewerControls", () => {
         gestureError="Camera access was blocked."
         gestureStatus="blocked"
         gestureVideoRef={createRef<HTMLVideoElement>()}
+        gestureDebugFrame={null}
         isExploded={false}
         onToggleGestures={vi.fn()}
         onToggleExplode={vi.fn()}
@@ -31,6 +32,7 @@ describe("ViewerControls", () => {
         gestureError="This browser does not support webcam gesture controls."
         gestureStatus="unsupported"
         gestureVideoRef={createRef<HTMLVideoElement>()}
+        gestureDebugFrame={null}
         isExploded
         onToggleGestures={vi.fn()}
         onToggleExplode={vi.fn()}
@@ -54,6 +56,7 @@ describe("ViewerControls", () => {
         gestureError={null}
         gestureStatus="idle"
         gestureVideoRef={createRef<HTMLVideoElement>()}
+        gestureDebugFrame={null}
         isExploded={false}
         onToggleGestures={vi.fn()}
         onToggleExplode={onToggleExplode}
@@ -66,5 +69,32 @@ describe("ViewerControls", () => {
 
     expect(onToggleExplode).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders gesture debugging metadata when a frame is available", () => {
+    render(
+      <ViewerControls
+        gestureEnabled
+        gestureError={null}
+        gestureStatus="tracking"
+        gestureVideoRef={createRef<HTMLVideoElement>()}
+        gestureDebugFrame={{
+          bounds: { minX: 0.2, minY: 0.15, maxX: 0.6, maxY: 0.75 },
+          confidence: 0.93,
+          graceFramesRemaining: 0,
+          isStable: true,
+          isWithinGraceWindow: false,
+          palmCenter: { x: 0.4, y: 0.5 },
+          gestureName: "Open_Palm",
+        }}
+        isExploded={false}
+        onToggleGestures={vi.fn()}
+        onToggleExplode={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Open Palm 93%")).toBeTruthy();
+    expect(screen.getByText("Stable")).toBeTruthy();
   });
 });

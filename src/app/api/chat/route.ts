@@ -10,6 +10,7 @@ export async function POST(request: Request): Promise<Response> {
     const response: ChatResponse = await processChatTurn({
       inventionId: body.inventionId,
       componentId: body.componentId,
+      viewerState: body.viewerState,
       requestMessages: body.messages,
       delivery: latestUserMessage?.delivery ?? "typed",
       sessionId: body.sessionId,

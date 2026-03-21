@@ -185,6 +185,7 @@ export default function InventionDetailPage() {
   } = useExpert({
     inventionId: invention.id,
     componentId: selectedComponentId,
+    viewerState: { isExploded, highlightedComponentIds: Object.keys(highlightMap) },
     activeVoiceSessionId: voiceSessionId,
     onActions: handleExpertActions,
   });
@@ -267,6 +268,7 @@ export default function InventionDetailPage() {
               </div>
 
               <ViewerControls
+                gestureDebugFrame={gestureControls.debugFrame}
                 gestureEnabled={gestureEnabled}
                 gestureError={gestureControls.error}
                 gestureStatus={gestureControls.status}

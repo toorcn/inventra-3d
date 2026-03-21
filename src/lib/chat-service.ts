@@ -5,7 +5,7 @@ import { hasAgoraVoiceConfig, speakAgoraAgent } from "@/lib/agora";
 import { buildToolInstructions, runExpertAgent } from "@/lib/expert-agent";
 import { chatCompletionStream } from "@/lib/openrouter";
 import { hasPusherConfig, pusherServer, voiceChannel } from "@/lib/pusher";
-import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery, VoiceSessionStatus } from "@/types";
+import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery, ViewerState, VoiceSessionStatus } from "@/types";
 import {
   appendVoiceSessionMessage,
   enqueueVoiceSessionActions,
@@ -60,6 +60,7 @@ function extractLatestUserMessage(messages: ChatMessage[]): ChatMessage | undefi
 type ProcessChatTurnInput = {
   inventionId: string;
   componentId?: string | null;
+  viewerState?: ViewerState | null;
   requestMessages: ChatMessage[];
   delivery: TranscriptDelivery;
   sessionId?: string;
@@ -69,6 +70,7 @@ type ProcessChatTurnInput = {
 export async function processChatTurn({
   inventionId,
   componentId,
+  viewerState,
   requestMessages,
   delivery,
   sessionId,
@@ -116,7 +118,7 @@ export async function processChatTurn({
 
   const component =
     componentId && componentId.trim().length > 0 ? getComponentById(componentId) : undefined;
-  const result = await runExpertAgent(invention, toOpenRouterMessages(conversationMessages), component);
+  const result = await runExpertAgent(invention, toOpenRouterMessages(conversationMessages), component, viewerState ?? undefined);
   const assistantMessageId = randomUUID();
   const assistantMessage: ChatMessage = {
     id: assistantMessageId,
