@@ -38,8 +38,43 @@ function buildSuggestedQuestions(inventionId: string, componentId?: string | nul
   return base;
 }
 
+async function playTTS(text: string, avatarPersona: string): Promise<void> {
+  try {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, persona: avatarPersona }),
+    });
+
+    if (!response.ok) {
+      // TTS unavailable — silently skip
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+
+    await new Promise<void>((resolve) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audio.play().catch(() => resolve());
+    });
+  } catch {
+    // TTS failed — don't break chat
+  }
+}
+
 export function useExpert({ inventionId, componentId }: UseExpertProps) {
   const invention = getInventionById(inventionId);
+  const avatarPersona = invention?.avatarPersona ?? "AI Guide";
+
   const introMessage: ChatMessage = useMemo(
     () => ({
       id: "intro",
@@ -76,7 +111,6 @@ export function useExpert({ inventionId, componentId }: UseExpertProps) {
 
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
-      setIsSpeaking(true);
 
       try {
         const response = await fetch("/api/chat", {
@@ -104,6 +138,12 @@ export function useExpert({ inventionId, componentId }: UseExpertProps) {
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
+
+        // TTS playback — non-blocking, won't break chat on failure
+        setIsSpeaking(true);
+        playTTS(text, avatarPersona).finally(() => {
+          setIsSpeaking(false);
+        });
       } catch (error) {
         const apiError = error instanceof Error ? error.message : "";
         const missingKey = apiError.includes("OPENROUTER_API_KEY");
@@ -118,10 +158,9 @@ export function useExpert({ inventionId, componentId }: UseExpertProps) {
         setMessages((prev) => [...prev, errorMsg]);
       } finally {
         setIsLoading(false);
-        setIsSpeaking(false);
       }
     },
-    [inventionId, componentId, messages],
+    [inventionId, componentId, messages, avatarPersona],
   );
 
   const clearMessages = useCallback(() => {

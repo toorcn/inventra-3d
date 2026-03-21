@@ -40,7 +40,7 @@ export function InventionCard({ invention, isSelected, onClick }: InventionCardP
           </span>
           <div className="flex shrink-0 items-center gap-1.5">
             {invention.hasModel && (
-              <Box className="size-3 text-cyan-400/70 group-hover:text-cyan-400 transition-colors" />
+              <Box className="size-3 text-blue-400/70 group-hover:text-blue-400 transition-colors" />
             )}
             <ChevronRight className="size-3.5 text-white/15 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-white/40" />
           </div>

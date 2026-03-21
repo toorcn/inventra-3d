@@ -87,7 +87,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setDemoRunning(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 backdrop-blur-xl transition-colors hover:bg-cyan-400/20"
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-600/10 px-3 py-2 text-sm text-blue-200 backdrop-blur-xl transition-colors hover:bg-blue-500/20"
               >
                 <Play className="size-4" />
                 Start Demo

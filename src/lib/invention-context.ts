@@ -4,33 +4,37 @@ export function buildInventionContext(
   invention: Invention,
   component?: InventionComponent,
 ): string {
-  const lines = [
-    `You are an expert historian and engineer explaining the ${invention.title}.`,
-    `Year: ${invention.year}`,
-    `Inventors: ${invention.inventors.join(", ")}`,
-    `Country: ${invention.country}`,
-    `Category: ${invention.category}`,
+  const avatarPersona = invention.avatarPersona ?? "an expert guide";
+
+  // Layer 1 — Base persona
+  const layer1 = [
+    `You are ${avatarPersona}, explaining ${invention.title} to a curious student.`,
+    `Use plain language — no legal terms, no jargon.`,
+    `Be enthusiastic but precise. Keep answers under 3 sentences unless asked for more.`,
+    `Never say "patent claim" — translate everything to plain English.`,
+  ].join("\n");
+
+  // Layer 2 — Invention context
+  const layer2Lines = [
+    `You are explaining the ${invention.title}, invented in ${invention.year} in ${invention.location.label}.`,
     `Description: ${invention.description}`,
+    `Patent: ${invention.patentNumber ?? "Pre-patent era"}`,
   ];
+  const layer2 = layer2Lines.join("\n");
 
-  if (invention.patentNumber) {
-    lines.push(`Patent: ${invention.patentNumber}`);
-  }
-
+  // Layer 3 — Component (when selected)
+  let layer3 = "";
   if (component) {
-    lines.push(`Focused component: ${component.name}`);
-    lines.push(`Component function: ${component.description}`);
-    lines.push(`Materials: ${component.materials.join(", ")}`);
-    if (component.patentText) {
-      lines.push(`Relevant technical text: ${component.patentText}`);
-    }
+    layer3 = [
+      `The user is currently looking at the ${component.name}.`,
+      `What it does: ${component.description}`,
+      `Source: ${component.patentText ?? "No patent text available"}`,
+      `Reference this component specifically in your next response.`,
+    ].join("\n");
   }
 
-  lines.push(
-    "Tone guidelines: clear, educational, and engaging for mixed audiences.",
-    "Response length: 2-3 short paragraphs maximum.",
-    "Always connect explanations to real-world impact.",
-  );
+  const layers = [layer1, layer2];
+  if (layer3) layers.push(layer3);
 
-  return lines.join("\n");
+  return layers.join("\n\n");
 }

@@ -88,14 +88,14 @@ export function SidePanel({
     <aside className="pointer-events-auto flex h-full w-96 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0d14]/80 shadow-2xl shadow-black/40 backdrop-blur-2xl">
 
       {/* Top accent line */}
-      <div className="h-px w-full bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent" />
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-blue-500/60 to-transparent" />
 
       {/* Header */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between mb-0.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 ring-1 ring-white/10">
-              <Layers className="size-4 text-cyan-400" />
+            <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600/20 to-blue-800/20 ring-1 ring-white/10">
+              <Layers className="size-4 text-blue-400" />
             </div>
             <div>
               <h2 className="text-[15px] font-bold tracking-tight text-white leading-none">Inventions</h2>
@@ -104,8 +104,8 @@ export function SidePanel({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Sparkles className="size-3 text-cyan-400/60" />
-            <span className="rounded-full bg-gradient-to-r from-blue-600/30 to-cyan-500/30 border border-cyan-500/20 px-2.5 py-0.5 text-xs font-bold text-cyan-300 tabular-nums">
+            <Sparkles className="size-3 text-blue-400/60" />
+            <span className="rounded-full bg-gradient-to-r from-blue-600/30 to-blue-500/30 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-300 tabular-nums">
               {inventions.length}
             </span>
           </div>

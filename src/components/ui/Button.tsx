@@ -19,7 +19,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-[var(--glow-blue)] hover:brightness-110",
+    "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-[var(--glow-blue)] hover:brightness-110",
   secondary:
     "bg-white/10 border border-white/15 text-[var(--text-primary)] hover:bg-white/20",
   ghost: "bg-transparent border border-white/10 text-[var(--text-secondary)] hover:text-white hover:bg-white/10",

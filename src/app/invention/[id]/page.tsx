@@ -95,7 +95,7 @@ export default function InventionDetailPage() {
                   <h2 className="mb-3 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
                     {invention.title}
                   </h2>
-                  <div className="h-1 w-20 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                  <div className="h-1 w-20 rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
                 </div>
                 
                 <div className="prose prose-invert max-w-none">
@@ -118,7 +118,7 @@ export default function InventionDetailPage() {
                     <p className="text-xl font-semibold text-white">{invention.year}</p>
                   </div>
                   <div>
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Primary Inventor</h4>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Primary Inventor</h4>
                     <p className="text-xl font-semibold text-white">{invention.inventors[0]}</p>
                   </div>
                 </div>

@@ -45,7 +45,7 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
             </div>
           </div>
           <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 shadow-sm transition-colors hover:bg-white/[0.04]">
-            <MapPin className="size-4 text-cyan-400" />
+            <MapPin className="size-4 text-blue-400" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Origin</p>
               <p className="text-sm font-semibold text-white truncate">{invention.location.label}</p>
@@ -65,7 +65,7 @@ export function InventionDetail({ invention, onBack, onEnterViewer }: InventionD
             </p>
           </section>
 
-          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-cyan-500/50 before:to-transparent">
+          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-blue-500/50 before:to-transparent">
             <div className="mb-2 flex items-center gap-2 text-[var(--text-secondary)]">
               <FileText className="size-3.5" />
               <h3 className="text-[10px] font-bold uppercase tracking-widest">Invention Story</h3>

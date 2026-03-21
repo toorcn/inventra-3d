@@ -5,8 +5,10 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useHandGestures } from "@/hooks/useHandGestures";
+import { useExpert } from "@/hooks/useExpert";
 import { WebcamLayer } from "./WebcamLayer";
 import ComponentLabels from "./ComponentLabels";
+import AvatarPanel from "./AvatarPanel";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import type { Invention, InventionComponent } from "@/types";
 
@@ -38,6 +40,40 @@ export default function HolographicViewerClient({
   // Selected component state
   const [selectedComponent, setSelectedComponent] = useState<InventionComponent | null>(null);
   const [isExploded, setIsExploded] = useState(false);
+
+  // Expert chat hook — used for auto-announcements
+  const { sendMessage: sendExpertMessage } = useExpert({
+    inventionId: invention.id,
+    componentId: selectedComponent?.id ?? null,
+  });
+
+  // Intro audio auto-play on mount
+  useEffect(() => {
+    const introPath = `/audio/intros/${invention.id}-intro.mp3`;
+    const audio = new Audio(introPath);
+    audio.play().catch(() => console.warn("Intro audio not available"));
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, [invention.id]);
+
+  // Auto-announce when a component is selected
+  const prevComponentRef = useRef<InventionComponent | null>(null);
+  useEffect(() => {
+    if (
+      selectedComponent &&
+      selectedComponent.id !== prevComponentRef.current?.id
+    ) {
+      prevComponentRef.current = selectedComponent;
+      sendExpertMessage(
+        `You've selected the ${selectedComponent.name}. ${selectedComponent.description}`
+      );
+    }
+    if (!selectedComponent) {
+      prevComponentRef.current = null;
+    }
+  }, [selectedComponent, sendExpertMessage]);
 
   // Three.js refs
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -343,7 +379,10 @@ export default function HolographicViewerClient({
         }}
       />
 
-      {/* Layer 4 — UI Overlays */}
+      {/* Layer 4 — Avatar Panel */}
+      <AvatarPanel invention={invention} selectedComponent={selectedComponent} />
+
+      {/* Layer 5 — UI Overlays */}
 
       {/* Gesture confidence HUD — top-center */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-mono text-white/60">
