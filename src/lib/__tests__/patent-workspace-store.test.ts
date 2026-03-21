@@ -1,8 +1,9 @@
 import { rm, writeFile } from "node:fs/promises";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPatentWorkspaceManifest } from "@/lib/patent-workspace";
 import {
   getPatentWorkspaceDiskPaths,
+  readPatentWorkspaceArtifact,
   readPatentWorkspaceManifest,
   readPatentWorkspaceManifestIfCompatible,
   writePatentWorkspaceManifest,
@@ -93,5 +94,25 @@ describe("patent workspace store", () => {
     await writeFile(diskPaths.manifestAbsolute, JSON.stringify(incompatible, null, 2), "utf8");
 
     await expect(readPatentWorkspaceManifestIfCompatible(patentId)).resolves.toBeNull();
+  });
+
+  it("reads remote workspace artifacts through fetch for blob-backed assets", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => Buffer.from("remote-artifact"),
+    });
+    const originalFetch = global.fetch;
+    global.fetch = fetchMock as typeof fetch;
+
+    try {
+      const buffer = await readPatentWorkspaceArtifact("https://example.com/patents/test/components/generated/hero.png");
+      expect(buffer.toString("utf8")).toBe("remote-artifact");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://example.com/patents/test/components/generated/hero.png",
+        { cache: "no-store" },
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
