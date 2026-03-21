@@ -8,6 +8,7 @@ interface InventionModelProps {
   inventionId: string;
   isExploded: boolean;
   selectedComponentId: string | null;
+  highlightMap?: Record<string, { color?: string; mode?: "glow" | "pulse" }>;
   onComponentSelect: (id: string) => void;
 }
 
@@ -15,6 +16,7 @@ export function InventionModel({
   inventionId,
   isExploded,
   selectedComponentId,
+  highlightMap,
   onComponentSelect,
 }: InventionModelProps) {
   const definition = getModelDefinitionByInventionId(inventionId);
@@ -33,6 +35,7 @@ export function InventionModel({
           <ComponentMesh
             model={comp}
             isSelected={selectedComponentId === comp.componentId}
+            highlight={highlightMap?.[comp.componentId]}
             onSelect={onComponentSelect}
           />
         </ExplodedView>

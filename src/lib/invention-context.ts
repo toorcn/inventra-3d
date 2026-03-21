@@ -1,9 +1,11 @@
+import { getComponentsByInventionId } from "@/data/invention-components";
 import type { Invention, InventionComponent } from "@/types";
 
 export function buildInventionContext(
   invention: Invention,
   component?: InventionComponent,
 ): string {
+  const components = getComponentsByInventionId(invention.id);
   const lines = [
     `You are an expert historian and engineer explaining the ${invention.title}.`,
     `Year: ${invention.year}`,
@@ -31,6 +33,16 @@ export function buildInventionContext(
     "Response length: 2-3 short paragraphs maximum.",
     "Always connect explanations to real-world impact.",
   );
+
+  if (components.length > 0) {
+    lines.push(
+      `Component IDs: ${components.map((comp) => `${comp.id}=${comp.name}`).join(" | ")}`,
+      "If a visual cue helps, append one action block on its own line:",
+      "[[ACTIONS]]{\"actions\":[{\"type\":\"highlight\",\"componentIds\":[\"...\"]}]}[[/ACTIONS]]",
+      "Allowed action types: highlight, select, explode, assemble, reset, beam.",
+      "Never mention the action block in your response.",
+    );
+  }
 
   return lines.join("\n");
 }

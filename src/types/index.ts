@@ -71,6 +71,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  actions?: ExpertAction[];
   timestamp: number;
 }
 
@@ -79,6 +80,31 @@ export interface ChatRequest {
   inventionId: string;
   componentId?: string;
 }
+
+export type ExpertAction =
+  | {
+      type: "highlight";
+      componentIds: string[];
+      durationMs?: number;
+      color?: string;
+      mode?: "glow" | "pulse";
+    }
+  | {
+      type: "select";
+      componentId: string;
+      durationMs?: number;
+    }
+  | { type: "explode" }
+  | { type: "assemble" }
+  | { type: "reset" }
+  | {
+      type: "beam";
+      fromComponentId: string;
+      toComponentId: string;
+      durationMs?: number;
+      color?: string;
+      thickness?: number;
+    };
 
 export interface GlobeMarker {
   id: string;

@@ -4,18 +4,21 @@ import { ExpertAvatar } from "./ExpertAvatar";
 import { MessageBubble } from "./MessageBubble";
 import { SuggestedQuestions } from "./SuggestedQuestions";
 import { useExpert } from "@/hooks/useExpert";
+import type { ExpertAction } from "@/types";
 import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ChatPanelProps {
   inventionId: string;
   componentId?: string | null;
+  onActions?: (actions: ExpertAction[]) => void;
 }
 
-export function ChatPanel({ inventionId, componentId }: ChatPanelProps) {
+export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProps) {
   const { messages, isLoading, isSpeaking, sendMessage, suggestedQuestions } = useExpert({
     inventionId,
     componentId,
+    onActions,
   });
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);

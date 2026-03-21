@@ -12,6 +12,14 @@ interface ModelViewerProps {
   inventionId: string;
   isExploded: boolean;
   selectedComponentId: string | null;
+  highlightMap?: Record<string, { color?: string; mode?: "glow" | "pulse" }>;
+  beamEffect?: {
+    id: string;
+    fromComponentId: string;
+    toComponentId: string;
+    color?: string;
+    thickness?: number;
+  } | null;
   onComponentSelect: (id: string | null) => void;
 }
 

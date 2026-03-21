@@ -6,12 +6,27 @@ import { ComponentInfo } from "@/components/viewer/ComponentInfo";
 import ModelViewer from "@/components/viewer/ModelViewer";
 import { ViewerControls } from "@/components/viewer/ViewerControls";
 import { Badge } from "@/components/ui/Badge";
+import { getComponentsByInventionId } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
+import type { ExpertAction } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+
+type HighlightMap = Record<string, { color?: string; mode?: "glow" | "pulse" }>;
+type BeamEffect = {
+  id: string;
+  fromComponentId: string;
+  toComponentId: string;
+  color?: string;
+  thickness?: number;
+};
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 export default function InventionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -24,6 +39,107 @@ export default function InventionDetailPage() {
 
   const [isExploded, setIsExploded] = useState(false);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [highlightMap, setHighlightMap] = useState<HighlightMap>({});
+  const [beamEffect, setBeamEffect] = useState<BeamEffect | null>(null);
+  const timeoutsRef = useRef<number[]>([]);
+
+  const componentIdSet = useMemo(
+    () => new Set(getComponentsByInventionId(invention.id).map((comp) => comp.id)),
+    [invention.id],
+  );
+
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      timeoutsRef.current = [];
+    };
+  }, []);
+
+  const handleExpertActions = useCallback(
+    (actions: ExpertAction[]) => {
+      if (!invention.hasModel) return;
+
+      actions.forEach((action) => {
+        if (action.type === "highlight") {
+          const ids = action.componentIds.filter((id) => componentIdSet.has(id));
+          if (ids.length === 0) return;
+          setHighlightMap((prev) => {
+            const next = { ...prev };
+            ids.forEach((id) => {
+              next[id] = { color: action.color, mode: action.mode };
+            });
+            return next;
+          });
+          const duration = action.durationMs ?? 3500;
+          if (duration > 0) {
+            const timeoutId = window.setTimeout(() => {
+              setHighlightMap((prev) => {
+                const next = { ...prev };
+                ids.forEach((id) => delete next[id]);
+                return next;
+              });
+            }, duration);
+            timeoutsRef.current.push(timeoutId);
+          }
+          return;
+        }
+
+        if (action.type === "select") {
+          if (!componentIdSet.has(action.componentId)) return;
+          setSelectedComponentId(action.componentId);
+          if (action.durationMs && action.durationMs > 0) {
+            const timeoutId = window.setTimeout(() => {
+              setSelectedComponentId((current) =>
+                current === action.componentId ? null : current,
+              );
+            }, action.durationMs);
+            timeoutsRef.current.push(timeoutId);
+          }
+          return;
+        }
+
+        if (action.type === "explode") {
+          setIsExploded(true);
+          return;
+        }
+
+        if (action.type === "assemble") {
+          setIsExploded(false);
+          return;
+        }
+
+        if (action.type === "reset") {
+          setIsExploded(false);
+          setSelectedComponentId(null);
+          setHighlightMap({});
+          setBeamEffect(null);
+          return;
+        }
+
+        if (action.type === "beam") {
+          if (!componentIdSet.has(action.fromComponentId) || !componentIdSet.has(action.toComponentId)) {
+            return;
+          }
+          const beamId = uid();
+          setBeamEffect({
+            id: beamId,
+            fromComponentId: action.fromComponentId,
+            toComponentId: action.toComponentId,
+            color: action.color,
+            thickness: action.thickness,
+          });
+          const duration = action.durationMs ?? 2000;
+          if (duration > 0) {
+            const timeoutId = window.setTimeout(() => {
+              setBeamEffect((current) => (current?.id === beamId ? null : current));
+            }, duration);
+            timeoutsRef.current.push(timeoutId);
+          }
+        }
+      });
+    },
+    [componentIdSet, invention.hasModel],
+  );
 
   return (
     <main className="flex h-screen flex-col">
@@ -52,6 +168,8 @@ export default function InventionDetailPage() {
                   inventionId={invention.id}
                   isExploded={isExploded}
                   selectedComponentId={selectedComponentId}
+                  highlightMap={highlightMap}
+                  beamEffect={beamEffect}
                   onComponentSelect={setSelectedComponentId}
                 />
               </ErrorBoundary>
@@ -128,7 +246,11 @@ export default function InventionDetailPage() {
         </div>
 
         <aside className="w-[420px] border-l border-white/5 bg-black/20">
-          <ChatPanel inventionId={invention.id} componentId={selectedComponentId} />
+          <ChatPanel
+            inventionId={invention.id}
+            componentId={selectedComponentId}
+            onActions={handleExpertActions}
+          />
         </aside>
       </section>
     </main>
