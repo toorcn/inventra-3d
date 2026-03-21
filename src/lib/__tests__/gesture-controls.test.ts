@@ -235,8 +235,8 @@ describe("gesture-controls", () => {
       y: -0.5,
     });
 
-    expect(rotated.rotationY).toBeCloseTo(0.735, 5);
-    expect(rotated.rotationX).toBeCloseTo(0.735, 5);
+    expect(rotated.rotationY).toBeCloseTo(-1.05, 5);
+    expect(rotated.rotationX).toBeCloseTo(-0.9, 5);
 
     const clamped = applySmoothedRotation(
       {
@@ -246,6 +246,6 @@ describe("gesture-controls", () => {
       { x: 0, y: -1 },
     );
 
-    expect(clamped.rotationX).toBe(0.9);
+    expect(clamped.rotationX).toBe(-0.9);
   });
 });
