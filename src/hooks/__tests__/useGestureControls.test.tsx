@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useGestureControls } from "@/hooks/useGestureControls";
 
 const recognizerClose = vi.fn();
@@ -45,6 +45,18 @@ function GestureHarness({
 }
 
 describe("useGestureControls", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    recognizerClose.mockClear();
+    recognizer.recognizeForVideo.mockReset();
+    recognizer.recognizeForVideo.mockReturnValue({
+      gestures: [],
+      landmarks: [],
+    });
+    createFromOptions.mockClear();
+    forVisionTasks.mockClear();
+  });
+
   it("starts tracking when enabled and cleans up when disabled", async () => {
     const stopTrack = vi.fn();
     const getUserMedia = vi.fn().mockResolvedValue({
@@ -97,5 +109,52 @@ describe("useGestureControls", () => {
     pauseSpy.mockRestore();
     rafSpy.mockRestore();
     cancelSpy.mockRestore();
+  });
+
+  it("suppresses the known MediaPipe XNNPACK console noise", async () => {
+    const stopTrack = vi.fn();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: stopTrack }],
+    });
+
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "readyState", {
+      configurable: true,
+      get() {
+        return HTMLMediaElement.HAVE_CURRENT_DATA;
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      configurable: true,
+      get() {
+        return 1;
+      },
+    });
+
+    recognizer.recognizeForVideo.mockImplementation(() => {
+      console.error("INFO: Created TensorFlow Lite XNNPACK delegate for CPU.");
+      return {
+        gestures: [],
+        landmarks: [],
+      };
+    });
+
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 1);
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, "error");
+
+    render(<GestureHarness enabled />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").textContent).toBe("tracking");
+    });
+
+    expect(recognizer.recognizeForVideo).toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 });

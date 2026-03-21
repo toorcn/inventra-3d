@@ -25,12 +25,30 @@ interface UseGestureControlsReturn {
   videoRef: MutableRefObject<HTMLVideoElement | null>;
 }
 
+const MEDIAPIPE_IGNORED_CONSOLE_MESSAGES = [
+  "Created TensorFlow Lite XNNPACK delegate for CPU.",
+];
+
 function isPermissionError(error: unknown) {
   if (error instanceof DOMException) {
     return error.name === "NotAllowedError" || error.name === "SecurityError";
   }
 
   return false;
+}
+
+function matchesIgnoredGestureConsoleMessage(args: unknown[]) {
+  return args.some((arg) => {
+    if (typeof arg === "string") {
+      return MEDIAPIPE_IGNORED_CONSOLE_MESSAGES.some((message) => arg.includes(message));
+    }
+
+    if (arg instanceof Error) {
+      return MEDIAPIPE_IGNORED_CONSOLE_MESSAGES.some((message) => arg.message.includes(message));
+    }
+
+    return false;
+  });
 }
 
 async function waitForVideoReady(video: HTMLVideoElement) {
@@ -74,6 +92,7 @@ export function useGestureControls({
   const onExplodeRef = useRef(onExplode);
   const onRotateRef = useRef(onRotate);
   const sessionIdRef = useRef(0);
+  const restoreConsoleErrorRef = useRef<(() => void) | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<GestureControlStatus>("idle");
@@ -91,6 +110,26 @@ export function useGestureControls({
   }, [onRotate]);
 
   useEffect(() => {
+    const installGestureConsoleFilter = () => {
+      if (restoreConsoleErrorRef.current) {
+        return;
+      }
+
+      const originalConsoleError = console.error;
+      console.error = (...args: unknown[]) => {
+        if (matchesIgnoredGestureConsoleMessage(args)) {
+          return;
+        }
+
+        originalConsoleError(...args);
+      };
+
+      restoreConsoleErrorRef.current = () => {
+        console.error = originalConsoleError;
+        restoreConsoleErrorRef.current = null;
+      };
+    };
+
     const stopSession = async (nextStatus: GestureControlStatus) => {
       if (rafRef.current !== null) {
         window.cancelAnimationFrame(rafRef.current);
@@ -115,6 +154,7 @@ export function useGestureControls({
       frameStateRef.current = DEFAULT_GESTURE_FRAME_STATE;
       lastInferenceAtRef.current = 0;
       lastVideoTimeRef.current = -1;
+      restoreConsoleErrorRef.current?.();
       setStatus(nextStatus);
     };
 
@@ -202,6 +242,8 @@ export function useGestureControls({
         if (!video) {
           throw new Error("Gesture preview is unavailable.");
         }
+
+        installGestureConsoleFilter();
 
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,

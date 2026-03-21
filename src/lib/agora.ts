@@ -43,6 +43,7 @@ export interface AgoraAgentJoinPayload {
       max_history: number;
       input_modalities: ["text"];
       output_modalities: ["text"];
+      request_timeout_ms: number;
       params: {
         model: string;
         max_tokens: number;
@@ -170,6 +171,7 @@ export function buildAgoraAgentJoinPayload(
         max_history: 32,
         input_modalities: ["text"],
         output_modalities: ["text"],
+        request_timeout_ms: 10000,
         params: {
           model: DEFAULT_OPENROUTER_MODEL,
           max_tokens: 700,

@@ -56,7 +56,7 @@ export interface ExpertAgentResult {
   actions: ExpertAction[];
 }
 
-function buildToolInstructions(invention: Invention, component?: InventionComponent): string {
+export function buildToolInstructions(invention: Invention, component?: InventionComponent): string {
   const components = getComponentsByInventionId(invention.id);
   const lines = [
     `You are an expert historian and engineer explaining the ${invention.title}.`,

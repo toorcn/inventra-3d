@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { extractLatestUserMessage } from "@/lib/agora";
-import { processVoiceWebhookTurn } from "@/lib/chat-service";
+import { processVoiceWebhookTurnStreaming } from "@/lib/chat-service";
 import { getVoiceSession } from "@/lib/voice-session-store";
-import type { ChatMessage, VoiceAgentWebhookRequest, VoiceAgentWebhookResponse } from "@/types";
+import type { ChatMessage, VoiceAgentWebhookRequest } from "@/types";
 
 export const runtime = "nodejs";
 
@@ -33,7 +33,19 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const body = (await request.json()) as VoiceAgentWebhookRequest;
-    const userText = extractLatestUserMessage(body);
+    const fullUserText = extractLatestUserMessage(body);
+
+    if (!fullUserText) {
+      return Response.json({ error: "Missing user content" }, { status: 400 });
+    }
+
+    // Agora accumulates all user utterances into a single message each turn.
+    // Extract only the new part by diffing against the last stored user message.
+    const prevUserText = session.messages.findLast((m) => m.role === "user")?.content ?? "";
+    const userText =
+      prevUserText && fullUserText.startsWith(prevUserText)
+        ? fullUserText.slice(prevUserText.length).trim()
+        : fullUserText;
 
     if (!userText) {
       return Response.json({ error: "Missing user content" }, { status: 400 });
@@ -49,32 +61,16 @@ export async function POST(request: Request): Promise<Response> {
       },
     ];
 
-    const result = await processVoiceWebhookTurn({
+    const stream = await processVoiceWebhookTurnStreaming({
       sessionId,
       requestMessages,
     });
 
-    const response: VoiceAgentWebhookResponse = {
-      id: `chatcmpl-${randomUUID()}`,
-      object: "chat.completion",
-      created: Math.floor(Date.now() / 1000),
-      model: body.model ?? "inventornet-voice-agent",
-      choices: [
-        {
-          index: 0,
-          finish_reason: "stop",
-          message: {
-            role: "assistant",
-            content: result.content,
-          },
-        },
-      ],
-    };
-
-    return Response.json(response, {
-      status: 200,
+    return new Response(stream, {
       headers: {
+        "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
       },
     });
   } catch (error) {

@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { getComponentById } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
 import { hasAgoraVoiceConfig, speakAgoraAgent } from "@/lib/agora";
-import { runExpertAgent } from "@/lib/expert-agent";
+import { buildToolInstructions, runExpertAgent } from "@/lib/expert-agent";
+import { chatCompletionStream } from "@/lib/openrouter";
 import { hasPusherConfig, pusherServer, voiceChannel } from "@/lib/pusher";
 import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery, VoiceSessionStatus } from "@/types";
 import {
@@ -186,4 +187,89 @@ export async function processVoiceWebhookTurn({
     delivery: "spoken",
     sessionId,
   });
+}
+
+export async function processVoiceWebhookTurnStreaming({
+  sessionId,
+  requestMessages,
+}: ProcessVoiceWebhookInput): Promise<ReadableStream<Uint8Array>> {
+  const session = getVoiceSession(sessionId);
+  const invention = getInventionById(session.inventionId);
+
+  if (!invention) {
+    throw new Error("Invention not found");
+  }
+
+  const userMessage = requestMessages[0];
+  appendVoiceSessionMessage(sessionId, userMessage);
+  setVoiceSessionThinking(sessionId, userMessage.content);
+  publishVoiceEvents(sessionId, [userMessage], [], "thinking", userMessage.content);
+
+  const component =
+    session.componentId && session.componentId.trim().length > 0
+      ? getComponentById(session.componentId)
+      : undefined;
+  const systemPrompt = buildToolInstructions(invention, component);
+  const conversationMessages = getVoiceSession(sessionId).messages;
+  const messagesForLlm = toOpenRouterMessages(conversationMessages);
+
+  const openRouterStream = await chatCompletionStream(
+    [{ role: "system", content: systemPrompt }, ...messagesForLlm],
+    { max_tokens: 700, temperature: 0.2 },
+  );
+
+  let fullContent = "";
+  const decoder = new TextDecoder();
+
+  const transform = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      controller.enqueue(chunk);
+      const text = decoder.decode(chunk, { stream: true });
+      for (const line of text.split("\n")) {
+        if (line.startsWith("data: ") && !line.includes("[DONE]")) {
+          try {
+            const json = JSON.parse(line.slice(6));
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) fullContent += delta;
+          } catch {
+            // Ignore malformed SSE chunks.
+          }
+        }
+      }
+    },
+    flush() {
+      const assistantMessage: ChatMessage = {
+        id: randomUUID(),
+        role: "assistant",
+        content: fullContent,
+        delivery: "spoken",
+        timestamp: Date.now(),
+      };
+      appendVoiceSessionMessage(sessionId, assistantMessage);
+      setVoiceSessionSpeaking(sessionId, fullContent);
+      publishVoiceEvents(sessionId, [assistantMessage], [], "speaking", null);
+
+      // Background: run structured output for 3D viewer actions.
+      void runExpertAgent(invention, messagesForLlm, component)
+        .then(({ actions }) => {
+          if (actions.length > 0) {
+            try {
+              enqueueVoiceSessionActions(sessionId, actions);
+              publishVoiceEvents(
+                sessionId,
+                [],
+                actions,
+                getVoiceSession(sessionId).status,
+                null,
+              );
+            } catch {
+              // Session may have expired.
+            }
+          }
+        })
+        .catch(() => {});
+    },
+  });
+
+  return openRouterStream.pipeThrough(transform);
 }
