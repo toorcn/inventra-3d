@@ -2,7 +2,7 @@
 
 import { getInventionById } from "@/data/inventions";
 import { getComponentById } from "@/data/invention-components";
-import type { ChatMessage, ExpertAction } from "@/types";
+import type { ChatMessage, ChatResponse, ExpertAction } from "@/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface UseExpertProps {
@@ -37,85 +37,6 @@ function buildSuggestedQuestions(inventionId: string, componentId?: string | nul
   }
 
   return base;
-}
-
-const ACTION_BLOCK_RE = /\[\[ACTIONS\]\]([\s\S]*?)\[\[\/ACTIONS\]\]/g;
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
-}
-
-function normalizeAction(raw: Record<string, unknown>): ExpertAction | null {
-  const type = raw.type;
-  if (typeof type !== "string") return null;
-
-  if (type === "highlight") {
-    if (!isStringArray(raw.componentIds)) return null;
-    return {
-      type,
-      componentIds: raw.componentIds,
-      durationMs: typeof raw.durationMs === "number" ? raw.durationMs : undefined,
-      color: typeof raw.color === "string" ? raw.color : undefined,
-      mode: raw.mode === "glow" || raw.mode === "pulse" ? raw.mode : undefined,
-    };
-  }
-
-  if (type === "select") {
-    if (typeof raw.componentId !== "string") return null;
-    return {
-      type,
-      componentId: raw.componentId,
-      durationMs: typeof raw.durationMs === "number" ? raw.durationMs : undefined,
-    };
-  }
-
-  if (type === "explode" || type === "assemble" || type === "reset") {
-    return { type };
-  }
-
-  if (type === "beam") {
-    if (typeof raw.fromComponentId !== "string" || typeof raw.toComponentId !== "string") return null;
-    return {
-      type,
-      fromComponentId: raw.fromComponentId,
-      toComponentId: raw.toComponentId,
-      durationMs: typeof raw.durationMs === "number" ? raw.durationMs : undefined,
-      color: typeof raw.color === "string" ? raw.color : undefined,
-      thickness: typeof raw.thickness === "number" ? raw.thickness : undefined,
-    };
-  }
-
-  return null;
-}
-
-function extractActions(text: string): { cleanText: string; actions: ExpertAction[] } {
-  const actions: ExpertAction[] = [];
-  let cleanText = text;
-
-  for (const match of text.matchAll(ACTION_BLOCK_RE)) {
-    const payload = match[1]?.trim();
-    if (payload) {
-      try {
-        const parsed = JSON.parse(payload) as unknown;
-        const actionList = Array.isArray(parsed)
-          ? parsed
-          : typeof parsed === "object" && parsed && Array.isArray((parsed as { actions?: unknown }).actions)
-            ? (parsed as { actions?: unknown }).actions
-            : [];
-        for (const action of actionList) {
-          if (action && typeof action === "object") {
-            const normalized = normalizeAction(action as Record<string, unknown>);
-            if (normalized) actions.push(normalized);
-          }
-        }
-      } catch {
-        // Ignore malformed action blocks.
-      }
-    }
-    cleanText = cleanText.replace(match[0], "").trim();
-  }
-
-  return { cleanText, actions };
 }
 
 export function useExpert({ inventionId, componentId, onActions }: UseExpertProps) {
@@ -169,13 +90,17 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           }),
         });
 
-        const text = await response.text();
-        const { cleanText, actions } = extractActions(text);
+        const payload = (await response.json()) as ChatResponse | { error?: string };
+        if ("error" in payload && payload.error) {
+          throw new Error(payload.error);
+        }
+
+        const { content: assistantContent, actions } = payload as ChatResponse;
 
         const assistantMsg: ChatMessage = {
           id: uid(),
           role: "assistant",
-          content: cleanText || text,
+          content: assistantContent,
           actions: actions.length ? actions : undefined,
           timestamp: Date.now(),
         };

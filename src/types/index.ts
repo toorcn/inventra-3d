@@ -81,6 +81,11 @@ export interface ChatRequest {
   componentId?: string;
 }
 
+export interface ChatResponse {
+  content: string;
+  actions: ExpertAction[];
+}
+
 export type ExpertAction =
   | {
       type: "highlight";

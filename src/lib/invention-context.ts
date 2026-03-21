@@ -37,10 +37,7 @@ export function buildInventionContext(
   if (components.length > 0) {
     lines.push(
       `Component IDs: ${components.map((comp) => `${comp.id}=${comp.name}`).join(" | ")}`,
-      "If a visual cue helps, append one action block on its own line:",
-      "[[ACTIONS]]{\"actions\":[{\"type\":\"highlight\",\"componentIds\":[\"...\"]}]}[[/ACTIONS]]",
-      "Allowed action types: highlight, select, explode, assemble, reset, beam.",
-      "Never mention the action block in your response.",
+      "Visual cues are available through the chat system's structured viewer-tool layer when needed.",
     );
   }
 

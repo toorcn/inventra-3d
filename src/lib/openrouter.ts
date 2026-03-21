@@ -132,3 +132,4 @@ export async function chatCompletionStream(
 }
 
 export type { OpenRouterMessage };
+export const hasOpenRouterApiKey = hasApiKey;

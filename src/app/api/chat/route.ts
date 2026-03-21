@@ -1,8 +1,7 @@
 import { getComponentById } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
-import { buildInventionContext } from "@/lib/invention-context";
-import { chatCompletion } from "@/lib/openrouter";
-import type { ChatMessage, ChatRequest } from "@/types";
+import { runExpertAgent } from "@/lib/expert-agent";
+import type { ChatMessage, ChatRequest, ChatResponse } from "@/types";
 
 function toOpenRouterMessages(messages: ChatMessage[]): Array<{ role: "system" | "user" | "assistant"; content: string }> {
   return messages
@@ -11,16 +10,6 @@ function toOpenRouterMessages(messages: ChatMessage[]): Array<{ role: "system" |
       role: message.role === "assistant" ? "assistant" : "user",
       content: message.content,
     }));
-}
-
-function textStream(content: string): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoder.encode(content));
-      controller.close();
-    },
-  });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -33,17 +22,20 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const component = body.componentId ? getComponentById(body.componentId) : undefined;
-    const systemPrompt = buildInventionContext(invention, component);
+    const result = await runExpertAgent(
+      invention,
+      toOpenRouterMessages(body.messages),
+      component,
+    );
 
-    const completion = await chatCompletion([
-      { role: "system", content: systemPrompt },
-      ...toOpenRouterMessages(body.messages),
-    ]);
+    const response: ChatResponse = {
+      content: result.content,
+      actions: result.actions,
+    };
 
-    return new Response(textStream(completion), {
+    return Response.json(response, {
       status: 200,
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache",
       },
     });
