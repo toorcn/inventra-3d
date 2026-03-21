@@ -249,17 +249,36 @@ export default function InventionDetailPage() {
   );
 
   return (
-    <main className="flex h-screen flex-col bg-[#0c0d11] relative overflow-hidden">
-      {/* Background Texture Overlay - Fine Technical Paper */}
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.05]" 
-           style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/brushed-alum.png")' }} />
+    <main className="flex h-screen flex-col bg-[#05060b] relative overflow-hidden font-sans antialiased">
+      {/* photographic Inventor's Studio Backdrop */}
+      <div className="absolute inset-0 z-0 bg-cover bg-center brightness-[0.35] grayscale-[0.3]" 
+           style={{ backgroundImage: 'url("/backgrounds/workshop.png")' }} />
       
-      {/* Drafting Grid Overlay */}
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.03]"
+      {/* Professional Glass Overlay & Vignette */}
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_rgba(5,6,11,0.8)_100%)]" />
+      <div className="absolute inset-0 z-0 bg-black/20 backdrop-blur-[2px]" />
+
+      {/* Background Texture Overlay - High-Res Technical Vellum (Layered) */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.05] contrast-125" 
+           style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/papyrus.png")' }} />
+      
+      {/* Professional Drafting Blueprint Overlay */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.06]"
            style={{ 
-             backgroundImage: 'linear-gradient(rgba(212, 175, 85, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(212, 175, 85, 0.1) 1px, transparent 1px)',
-             backgroundSize: '40px 40px'
+             backgroundImage: `
+               linear-gradient(rgba(212, 175, 85, 0.2) 1px, transparent 1px), 
+               linear-gradient(90deg, rgba(212, 175, 85, 0.2) 1px, transparent 1px),
+               linear-gradient(rgba(212, 175, 85, 0.08) 1px, transparent 1px), 
+               linear-gradient(90deg, rgba(212, 175, 85, 0.08) 1px, transparent 1px)
+             `,
+             backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px'
            }} />
+
+      {/* Blueprint Technical Markings (Concentric circles and angles) */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.03] flex items-center justify-center">
+        <div className="size-[800px] border border-[var(--accent-gold)] rounded-full" />
+        <div className="absolute size-[400px] border border-[var(--accent-gold)] rounded-full opacity-50" />
+      </div>
       
       <header className="relative z-20 flex items-center justify-between border-b border-[var(--border-gold)]/20 bg-[var(--bg-panel)] px-6 py-4 backdrop-blur-xl shadow-lg">
         <div className="absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-[var(--accent-gold)]/30 to-transparent" />
@@ -282,12 +301,13 @@ export default function InventionDetailPage() {
       </header>
 
       <section className="relative z-10 flex flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* Environment - Inventor's Desk Lighting */}
-        <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_75%_20%,_#1a1b26_0%,_#0c0d11_100%)] lg:flex-[2]">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')] opacity-[0.04] pointer-events-none" />
+        {/* Environment - Immersive Studio Depth */}
+        <div className="relative flex-1 overflow-hidden lg:flex-[2]">
+          {/* Subtle Ambient Studio Smoke/Atmosphere */}
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/felt-tip.png')] opacity-[0.02] pointer-events-none" />
           
-          {/* Desk Lamp Corner Glow */}
-          <div className="absolute -top-24 -right-24 size-[600px] bg-[var(--accent-gold)]/5 blur-[120px] rounded-full pointer-events-none" />
+          {/* Studio Lamp Spotlight Glow (Aggressive to match backdrop) */}
+          <div className="absolute -top-60 -right-60 size-[1000px] bg-[var(--accent-gold)]/10 blur-[200px] rounded-full pointer-events-none animate-pulse duration-[10000ms]" />
           {invention.hasModel ? (
             <>
               <ErrorBoundary>
