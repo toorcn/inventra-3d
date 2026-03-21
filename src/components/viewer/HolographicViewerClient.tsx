@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { useWebcam } from "@/hooks/useWebcam";
+import { useHandGestures } from "@/hooks/useHandGestures";
 import { WebcamLayer } from "./WebcamLayer";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import type { Invention, InventionComponent } from "@/types";
@@ -31,6 +32,7 @@ export default function HolographicViewerClient({
 }: HolographicViewerClientProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { videoRef, isReady: webcamReady, error: webcamError } = useWebcam();
+  const gestureState = useHandGestures(videoRef, webcamReady);
 
   // Three.js refs
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -274,6 +276,33 @@ export default function HolographicViewerClient({
     return () => window.removeEventListener("keydown", handleKey);
   }, [triggerExplode, triggerAssemble, onBack]);
 
+  // ── Gesture Controls ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const model = modelGroupRef.current;
+    if (!model) return;
+
+    const { gesture, wristDeltaX, pinchDistance } = gestureState;
+
+    // Explode / assemble on gesture
+    if (gesture === "palm_open") {
+      triggerExplode();
+    } else if (gesture === "fist") {
+      triggerAssemble();
+    }
+
+    // Rotate model based on wrist delta X
+    if (wristDeltaX !== 0) {
+      model.rotation.y += wristDeltaX * Math.PI * 2;
+    }
+
+    // Scale model based on pinch distance delta
+    if (pinchDistance !== 0) {
+      const newScale = model.scale.x * (1 + pinchDistance * 2);
+      const clamped = Math.min(Math.max(newScale, SCALE_MIN), SCALE_MAX);
+      model.scale.setScalar(clamped);
+    }
+  }, [gestureState, triggerExplode, triggerAssemble]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#000" }}>
@@ -283,6 +312,11 @@ export default function HolographicViewerClient({
       {/* Layer 2 — Three.js canvas injected by useEffect */}
 
       {/* Layer 3 — UI Overlays */}
+
+      {/* Gesture confidence HUD — top-center */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-mono text-white/60">
+        Gesture: {gestureState.gesture} ({Math.round(gestureState.confidence * 100)}%)
+      </div>
 
       {/* Webcam error overlay */}
       {webcamError && (
