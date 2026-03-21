@@ -6,7 +6,7 @@ const cesiumRoot = path.dirname(require.resolve("cesium/package.json"));
 const cesiumBuild = path.join(cesiumRoot, "Build/Cesium");
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["three", "react-globe.gl", "three-globe"],
+  transpilePackages: ["three"],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.plugins.push(
