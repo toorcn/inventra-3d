@@ -3,9 +3,10 @@
 interface SuggestedQuestionsProps {
   questions: string[];
   onSelect: (question: string) => void;
+  disabled?: boolean;
 }
 
-export function SuggestedQuestions({ questions, onSelect }: SuggestedQuestionsProps) {
+export function SuggestedQuestions({ questions, onSelect, disabled = false }: SuggestedQuestionsProps) {
   if (questions.length === 0) return null;
 
   return (
@@ -14,7 +15,8 @@ export function SuggestedQuestions({ questions, onSelect }: SuggestedQuestionsPr
         <button
           key={q}
           onClick={() => onSelect(q)}
-          className="cursor-pointer rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-white/10 hover:text-white"
+          disabled={disabled}
+          className="cursor-pointer rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           {q}
         </button>

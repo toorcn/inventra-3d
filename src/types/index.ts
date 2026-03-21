@@ -89,19 +89,16 @@ export interface ChatResponse {
   actions: ExpertAction[];
 }
 
+export interface VoiceTranscribeResponse {
+  text: string;
+}
+
+export interface VoiceSpeakRequest {
+  text: string;
+}
+
 export interface AgoraVoicePrepareRequest {
   inventionId: string;
-}
-
-export interface AgoraVoiceStartRequest {
-  inventionId: string;
-  componentId?: string;
-  channelName: string;
-  userRtcUid: number;
-}
-
-export interface AgoraVoiceStopRequest {
-  agentId: string;
 }
 
 export interface AgoraVoicePrepareResponse {
@@ -110,10 +107,6 @@ export interface AgoraVoicePrepareResponse {
   token: string;
   userRtcUid: number;
   expiresAt: number;
-}
-
-export interface AgoraVoiceStartResponse {
-  agentId: string;
 }
 
 export type ExpertAction =

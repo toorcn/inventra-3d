@@ -1,90 +1,380 @@
 "use client";
 
-import type {
-  IAgoraRTCClient,
-  IAgoraRTCRemoteUser,
-  IMicrophoneAudioTrack,
-  IAgoraRTC,
-} from "agora-rtc-sdk-ng";
-import type {
-  AgoraVoicePrepareResponse,
-  AgoraVoiceStartResponse,
-} from "@/types";
+import type { ChatResponse, VoiceTranscribeResponse } from "@/types";
+import type { IAgoraRTC, IAgoraRTCClient, ILocalAudioTrack } from "agora-rtc-sdk-ng";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type VoiceStatus = "idle" | "connecting" | "live" | "error";
+export type VoiceStatus =
+  | "idle"
+  | "connecting"
+  | "live"
+  | "recording"
+  | "transcribing"
+  | "speaking"
+  | "error";
 
 interface UseAgoraVoiceProps {
   inventionId: string;
-  componentId?: string | null;
+  onSpokenTurn: (content: string) => Promise<ChatResponse>;
 }
 
 type ActiveSession = {
-  agentId: string;
   channelName: string;
   userRtcUid: number;
 };
 
-export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) {
+function pickRecorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") {
+    return undefined;
+  }
+
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+  ];
+
+  return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const payload = (await response.json()) as { error?: string };
+    return payload.error ?? response.statusText;
+  }
+
+  return response.text();
+}
+
+export function useAgoraVoice({ inventionId, onSpokenTurn }: UseAgoraVoiceProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
-  const localTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
-  const remoteUsersRef = useRef<Map<number | string, IAgoraRTCRemoteUser>>(new Map());
+  const localTrackRef = useRef<ILocalAudioTrack | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingRef = useRef<MediaRecorder | null>(null);
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackUrlRef = useRef<string | null>(null);
   const sessionRef = useRef<ActiveSession | null>(null);
+  const sessionTokenRef = useRef(0);
+  const sessionCounterRef = useRef(0);
+  const turnBufferRef = useRef<BlobPart[]>([]);
+  const turnRecorderMimeTypeRef = useRef<string | undefined>(undefined);
 
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [isMuted, setIsMuted] = useState(false);
 
+  const stopPlayback = useCallback(() => {
+    const audio = playbackAudioRef.current;
+    const playbackUrl = playbackUrlRef.current;
+
+    playbackAudioRef.current = null;
+    playbackUrlRef.current = null;
+
+    if (audio) {
+      audio.pause();
+      audio.src = "";
+    }
+
+    if (playbackUrl) {
+      URL.revokeObjectURL(playbackUrl);
+    }
+  }, []);
+
   const cleanupRtc = useCallback(async () => {
+    const recorder = recordingRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        // Ignore recorder shutdown errors during cleanup.
+      }
+    }
+    recordingRef.current = null;
+    stopPlayback();
+
     const client = clientRef.current;
     const localTrack = localTrackRef.current;
+    const stream = mediaStreamRef.current;
+
+    if (client && localTrack) {
+      try {
+        await client.unpublish(localTrack);
+      } catch {
+        // Ignore cleanup failures if the track was never published.
+      }
+    }
 
     localTrack?.stop();
     localTrack?.close();
     localTrackRef.current = null;
 
+    stream?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    turnBufferRef.current = [];
+    turnRecorderMimeTypeRef.current = undefined;
+
     if (client) {
-      for (const user of remoteUsersRef.current.values()) {
-        user.audioTrack?.stop();
-      }
-      remoteUsersRef.current.clear();
       try {
-      await client.leave();
+        await client.leave();
       } catch {
         // Ignore cleanup errors when the client is already torn down.
       }
     }
 
     clientRef.current = null;
-  }, []);
+    sessionRef.current = null;
+  }, [stopPlayback]);
+
+  const speakAssistantResponse = useCallback(
+    async (content: string) => {
+      const text = content.trim();
+      const activeSessionToken = sessionTokenRef.current;
+
+      if (!text || activeSessionToken === 0) {
+        return;
+      }
+
+      stopPlayback();
+      setError(null);
+      setStatus("speaking");
+
+      try {
+        const response = await fetch("/api/voice/speak", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text }),
+        });
+
+        if (sessionTokenRef.current !== activeSessionToken) {
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(await readErrorMessage(response));
+        }
+
+        const audioBlob = await response.blob();
+        if (sessionTokenRef.current !== activeSessionToken) {
+          return;
+        }
+
+        const playbackUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(playbackUrl);
+        playbackAudioRef.current = audio;
+        playbackUrlRef.current = playbackUrl;
+
+        audio.onended = () => {
+          if (playbackAudioRef.current === audio) {
+            playbackAudioRef.current = null;
+          }
+          if (playbackUrlRef.current === playbackUrl) {
+            playbackUrlRef.current = null;
+            URL.revokeObjectURL(playbackUrl);
+          }
+          if (sessionTokenRef.current === activeSessionToken) {
+            setStatus("live");
+          }
+        };
+
+        audio.onerror = () => {
+          if (playbackAudioRef.current === audio) {
+            playbackAudioRef.current = null;
+          }
+          if (playbackUrlRef.current === playbackUrl) {
+            playbackUrlRef.current = null;
+            URL.revokeObjectURL(playbackUrl);
+          }
+          if (sessionTokenRef.current === activeSessionToken) {
+            setError("Assistant audio could not be played.");
+            setStatus("live");
+          }
+        };
+
+        await audio.play();
+      } catch (err) {
+        if (sessionTokenRef.current !== activeSessionToken) {
+          return;
+        }
+
+        setError(err instanceof Error ? err.message : "Assistant audio could not be played.");
+        setStatus("live");
+        stopPlayback();
+      }
+    },
+    [stopPlayback],
+  );
+
+  const processRecordedTurn = useCallback(
+    async (blob: Blob, sessionToken: number) => {
+      if (sessionTokenRef.current !== sessionToken || sessionToken === 0) {
+        return;
+      }
+
+      if (blob.size === 0) {
+        setStatus("live");
+        return;
+      }
+
+      setError(null);
+      setStatus("transcribing");
+
+      try {
+        const formData = new FormData();
+        formData.append("file", blob, "voice-turn.webm");
+        formData.append("language", "en");
+
+        const transcriptionResponse = await fetch("/api/voice/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (sessionTokenRef.current !== sessionToken) {
+          return;
+        }
+
+        if (!transcriptionResponse.ok) {
+          throw new Error(await readErrorMessage(transcriptionResponse));
+        }
+
+        const payload = (await transcriptionResponse.json()) as VoiceTranscribeResponse;
+        const transcript = payload.text.trim();
+
+        if (!transcript) {
+          setStatus("live");
+          return;
+        }
+
+        setStatus("transcribing");
+        const response = await onSpokenTurn(transcript);
+
+        if (sessionTokenRef.current !== sessionToken) {
+          return;
+        }
+
+        if (response.content.trim()) {
+          await speakAssistantResponse(response.content);
+        } else {
+          setStatus("live");
+        }
+      } catch (err) {
+        if (sessionTokenRef.current !== sessionToken) {
+          return;
+        }
+
+        setError(err instanceof Error ? err.message : "Speech turn failed.");
+        setStatus("live");
+      }
+    },
+    [onSpokenTurn, speakAssistantResponse],
+  );
+
+  const toggleRecording = useCallback(() => {
+    const activeSessionToken = sessionTokenRef.current;
+    const recorder = recordingRef.current;
+
+    if (status === "recording" && recorder && recorder.state !== "inactive") {
+      setStatus("transcribing");
+      try {
+        recorder.stop();
+      } catch {
+        setStatus("live");
+      }
+      return;
+    }
+
+    if (status !== "live" || isMuted) {
+      return;
+    }
+
+    const stream = mediaStreamRef.current;
+    if (!stream) {
+      setError("Microphone is not ready yet.");
+      return;
+    }
+
+    if (typeof MediaRecorder === "undefined") {
+      setError("Your browser does not support voice recording.");
+      return;
+    }
+
+    const mimeType = pickRecorderMimeType();
+    turnBufferRef.current = [];
+    turnRecorderMimeTypeRef.current = mimeType;
+
+    const nextRecorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
+
+    nextRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        turnBufferRef.current.push(event.data);
+      }
+    };
+
+    nextRecorder.onerror = () => {
+      if (sessionTokenRef.current !== activeSessionToken) {
+        return;
+      }
+
+      setError("Could not record microphone audio.");
+      setStatus("live");
+      recordingRef.current = null;
+    };
+
+    nextRecorder.onstop = () => {
+      recordingRef.current = null;
+      const turnBlob = new Blob(turnBufferRef.current, {
+        type: turnRecorderMimeTypeRef.current ?? "audio/webm",
+      });
+      turnBufferRef.current = [];
+      turnRecorderMimeTypeRef.current = undefined;
+      void processRecordedTurn(turnBlob, activeSessionToken);
+    };
+
+    recordingRef.current = nextRecorder;
+    setError(null);
+    setStatus("recording");
+    nextRecorder.start();
+  }, [isMuted, processRecordedTurn, status]);
 
   const toggleMute = useCallback(async () => {
     const localTrack = localTrackRef.current;
-    if (!localTrack || status !== "live") {
+    const stream = mediaStreamRef.current;
+
+    if (!localTrack || status === "idle" || status === "error") {
       return;
     }
 
     const nextMuted = !isMuted;
     await localTrack.setMuted(nextMuted);
+    stream?.getAudioTracks().forEach((track) => {
+      track.enabled = !nextMuted;
+    });
     setIsMuted(nextMuted);
   }, [isMuted, status]);
 
   const stopVoice = useCallback(async () => {
-    const session = sessionRef.current;
+    sessionTokenRef.current = 0;
     sessionRef.current = null;
 
     try {
-      if (session?.agentId) {
-        await fetch("/api/agora/session", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agentId: session.agentId }),
-        });
+      const recorder = recordingRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
       }
-    } finally {
+      recordingRef.current = null;
       await cleanupRtc();
       setStatus("idle");
       setError(null);
+      setIsMuted(false);
+    } catch (err) {
+      await cleanupRtc();
+      setStatus("idle");
+      setError(err instanceof Error ? err.message : "Failed to stop voice room.");
       setIsMuted(false);
     }
   }, [cleanupRtc]);
@@ -96,7 +386,7 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
   }, [stopVoice]);
 
   const startVoice = useCallback(async () => {
-    if (status === "connecting" || status === "live") {
+    if (status !== "idle" && status !== "error") {
       return;
     }
 
@@ -104,82 +394,74 @@ export function useAgoraVoice({ inventionId, componentId }: UseAgoraVoiceProps) 
     setError(null);
 
     try {
-      const rtcModule = (await import("agora-rtc-sdk-ng")) as { default: IAgoraRTC };
       const prepareResponse = await fetch("/api/agora/session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ inventionId }),
       });
 
-      const preparePayload = (await prepareResponse.json()) as AgoraVoicePrepareResponse | { error?: string };
-      if ("error" in preparePayload && preparePayload.error) {
-        throw new Error(preparePayload.error);
+      const preparePayload = await prepareResponse.json();
+      if (!prepareResponse.ok) {
+        throw new Error(preparePayload.error ?? "Agora RTC session failed to start.");
       }
 
-      const session = preparePayload as AgoraVoicePrepareResponse;
-      const client: IAgoraRTCClient = rtcModule.default.createClient({ mode: "rtc", codec: "vp8" });
+      const session = preparePayload as {
+        appId: string;
+        channelName: string;
+        token: string;
+        userRtcUid: number;
+      };
 
-      client.on("user-published", async (user, mediaType) => {
-        remoteUsersRef.current.set(user.uid, user);
-        await client.subscribe(user, mediaType);
-        if (mediaType === "audio") {
-          user.audioTrack?.play();
-        }
-      });
+      const rtcModule = (await import("agora-rtc-sdk-ng")) as { default: IAgoraRTC };
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioTrack = mediaStream.getAudioTracks()[0];
 
-      client.on("user-unpublished", (user, mediaType) => {
-        if (mediaType === "audio") {
-          user.audioTrack?.stop();
-        }
-      });
+      if (!audioTrack) {
+        throw new Error("Microphone access is required for voice mode.");
+      }
 
-      await client.join(session.appId, session.channelName, session.token, session.userRtcUid);
-      const localTrack = await rtcModule.default.createMicrophoneAudioTrack();
-      await client.publish([localTrack]);
+      const client = rtcModule.default.createClient({ mode: "rtc", codec: "vp8" });
+      const localTrack = rtcModule.default.createCustomAudioTrack({ mediaStreamTrack: audioTrack });
 
       clientRef.current = client;
       localTrackRef.current = localTrack;
-      setIsMuted(false);
+      mediaStreamRef.current = mediaStream;
 
-      const startResponse = await fetch("/api/agora/session", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inventionId,
-          componentId: componentId ?? undefined,
-          channelName: session.channelName,
-          userRtcUid: session.userRtcUid,
-        }),
-      });
+      await client.join(session.appId, session.channelName, session.token, session.userRtcUid);
+      await client.publish([localTrack]);
 
-      const startPayload = (await startResponse.json()) as AgoraVoiceStartResponse | { error?: string };
-      if ("error" in startPayload && startPayload.error) {
-        throw new Error(startPayload.error);
-      }
+      audioTrack.enabled = !isMuted;
+      await localTrack.setMuted(isMuted);
 
       sessionRef.current = {
-        agentId: (startPayload as AgoraVoiceStartResponse).agentId,
         channelName: session.channelName,
         userRtcUid: session.userRtcUid,
       };
+      sessionTokenRef.current = ++sessionCounterRef.current;
       setStatus("live");
     } catch (err) {
       await cleanupRtc();
-      sessionRef.current = null;
+      sessionTokenRef.current = 0;
       setStatus("error");
       setError(err instanceof Error ? err.message : "Agora voice failed to start.");
       setIsMuted(false);
     }
-  }, [cleanupRtc, componentId, inventionId, status]);
+  }, [cleanupRtc, inventionId, isMuted, status]);
 
   return {
     error,
-    isActive: status === "live",
+    isActive: status !== "idle" && status !== "error",
     isConnecting: status === "connecting",
+    isRecording: status === "recording",
     isMuted,
+    isSpeaking: status === "speaking",
+    speakAssistantResponse,
     startVoice,
     status,
     toggleMute,
+    toggleRecording,
     stopVoice,
   };
 }

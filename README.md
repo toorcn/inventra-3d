@@ -10,7 +10,7 @@ InventorNet is a Next.js app for exploring breakthrough inventions around the wo
 - **Open an invention detail page** with a story/brief.
 - **Explore select inventions in 3D** with component picking and an exploded view.
 - **Ask the AI Expert** questions about the invention or a selected component.
-- **Enter a live voice room** where the transcript rail hides and returns with the same session transcript.
+- **Enter a live voice room** where spoken turns are transcribed with Whisper, answered by the shared expert brain, and spoken back with ElevenLabs.
 
 > Note: without an API key, chat/search fall back to offline heuristics and a baseline response.
 
@@ -40,28 +40,21 @@ OPENROUTER_API_KEY=...
 # Used for OpenRouter headers (optional).
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Agora voice mode.
-# Copy this from the Conversational AI page's App ID field.
+# Agora RTC voice room transport.
+# Copy these from the Agora RTC/App console.
 AGORA_APP_ID=...
 AGORA_APP_CERTIFICATE=...
-AGORA_CUSTOMER_ID=...
-AGORA_CUSTOMER_SECRET=...
 
-# Agora Conversational AI agent model config.
-# Defaults to OpenRouter if AGORA_LLM_API_KEY is omitted.
-AGORA_LLM_URL=https://openrouter.ai/api/v1/chat/completions
-AGORA_LLM_API_KEY=...
-AGORA_LLM_MODEL=google/gemini-2.0-flash-001
+# Whisper transcription for spoken turns.
+OPENAI_API_KEY=...
 
-# Agora TTS provider config (ElevenLabs recommended).
-AGORA_TTS_VENDOR=elevenlabs
-AGORA_TTS_KEY=...
-AGORA_TTS_VOICE_ID=...
-AGORA_TTS_MODEL_ID=eleven_multilingual_v2
+# ElevenLabs TTS for assistant replies.
+ELEVENLABS_API_KEY=...
+ELEVENLABS_VOICE_ID=...
 
-# Optional for non-ElevenLabs TTS providers.
-AGORA_TTS_REGION=...
-AGORA_TTS_VOICE_NAME=...
+# Optional overrides for speech models.
+OPENAI_WHISPER_MODEL=whisper-1
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 ```
 
 ## Scripts
@@ -80,7 +73,7 @@ npm run test:watch # vitest in watch mode
 - **3D globe**: `react-globe.gl` (client-only)
 - **3D models / exploded view**: React Three Fiber + drei + three
 - **UI**: Tailwind CSS
-- **AI**: OpenRouter (server route at `src/app/api/chat/route.ts`)
+- **AI**: OpenRouter for typed chat, Whisper + ElevenLabs for voice
 
 ## Project structure
 
@@ -88,6 +81,7 @@ npm run test:watch # vitest in watch mode
 - `src/app/invention/[id]/page.tsx`: invention detail + 3D viewer + AI chat
 - `src/app/api/search/route.ts`: search endpoint (filters inventions)
 - `src/app/api/chat/route.ts`: AI chat endpoint (returns plain text)
+- `src/app/api/voice/*`: speech transcription and assistant audio endpoints
 - `src/data/*`: invention dataset, categories, 3D component definitions
 
 ## Notes

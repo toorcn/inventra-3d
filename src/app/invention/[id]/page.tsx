@@ -9,9 +9,9 @@ import { ViewerControls } from "@/components/viewer/ViewerControls";
 import { Badge } from "@/components/ui/Badge";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
-import { useAgoraVoice } from "@/hooks/useAgoraVoice";
+import { useAgoraVoice, type VoiceStatus } from "@/hooks/useAgoraVoice";
 import { useExpert } from "@/hooks/useExpert";
-import type { ExpertAction } from "@/types";
+import type { ExpertAction, TranscriptDelivery } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
@@ -48,7 +48,7 @@ export default function InventionDetailPage() {
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(true);
   const timeoutsRef = useRef<number[]>([]);
   const componentSelectionNonceRef = useRef(0);
-  const lastVoiceStatusRef = useRef<"idle" | "connecting" | "live" | "error">("idle");
+  const lastVoiceStatusRef = useRef<VoiceStatus>("idle");
 
   const componentIdSet = useMemo(
     () => new Set(getComponentsByInventionId(invention.id).map((comp) => comp.id)),
@@ -176,12 +176,17 @@ export default function InventionDetailPage() {
     onActions: handleExpertActions,
   });
 
+  const handleSpokenTurn = useCallback(
+    (content: string) => sendMessage(content, { delivery: "spoken" }),
+    [sendMessage],
+  );
+
   const voice = useAgoraVoice({
     inventionId: invention.id,
-    componentId: selectedComponentId,
+    onSpokenTurn: handleSpokenTurn,
   });
 
-  const isVoiceRoomActive = voice.status === "connecting" || voice.status === "live";
+  const isVoiceRoomActive = voice.status !== "idle" && voice.status !== "error";
   const shouldShowTranscriptRail = !isVoiceRoomActive || isTranscriptOpen;
 
   useEffect(() => {
@@ -190,12 +195,13 @@ export default function InventionDetailPage() {
     if (voice.status === "live" && previousStatus !== "live") {
       appendMessage({
         role: "system",
-        content: "Live voice room started. Spoken exchanges will stay in this transcript.",
+        content:
+          "Live voice room started. Speak one turn at a time; typed follow-ups will share the transcript.",
       });
       setIsTranscriptOpen(false);
     }
 
-    if (voice.status === "idle" && previousStatus === "live") {
+    if (voice.status === "idle" && previousStatus !== "idle" && previousStatus !== "error") {
       appendMessage({
         role: "system",
         content: "Live voice room ended. The transcript remains available in this session.",
@@ -214,7 +220,20 @@ export default function InventionDetailPage() {
     }
 
     lastVoiceStatusRef.current = voice.status;
-  }, [appendMessage, voice.error, voice.status]);
+  }, [appendMessage, isVoiceRoomActive, voice.error, voice.status]);
+
+  const handleConversationTurn = useCallback(
+    async (content: string, options?: { delivery?: TranscriptDelivery }) => {
+      const response = await sendMessage(content, options);
+
+      if (isVoiceRoomActive) {
+        await voice.speakAssistantResponse(response.content);
+      }
+
+      return response;
+    },
+    [isVoiceRoomActive, sendMessage, voice.speakAssistantResponse],
+  );
 
   const handleStartVoice = useCallback(() => {
     setIsTranscriptOpen(false);
@@ -265,17 +284,12 @@ export default function InventionDetailPage() {
 
               {(isVoiceRoomActive || voice.error) && (
                 <VoiceRoomControls
-                  status={
-                    voice.status === "error"
-                      ? "error"
-                      : voice.status === "connecting"
-                        ? "connecting"
-                        : "live"
-                  }
+                  status={voice.status}
                   isTranscriptOpen={isTranscriptOpen}
                   isMuted={voice.isMuted}
                   voiceError={voice.error}
                   onToggleTranscript={handleToggleTranscript}
+                  onToggleRecording={voice.toggleRecording}
                   onToggleMute={() => {
                     void voice.toggleMute();
                   }}
@@ -362,12 +376,12 @@ export default function InventionDetailPage() {
                 isLoading={isLoading}
                 isSpeaking={isSpeaking}
                 suggestedQuestions={suggestedQuestions}
-                isVoiceActive={voice.status === "live"}
-                isVoiceConnecting={voice.status === "connecting"}
+                voiceStatus={voice.status}
                 isVoiceMuted={voice.isMuted}
                 voiceError={voice.error}
-                onSendMessage={sendMessage}
+                onSendMessage={handleConversationTurn}
                 onStartVoice={handleStartVoice}
+                onToggleRecording={voice.toggleRecording}
                 onToggleMute={() => {
                   void voice.toggleMute();
                 }}

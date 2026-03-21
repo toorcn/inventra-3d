@@ -95,7 +95,7 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string, options: SendMessageOptions = {}) => {
+    async (content: string, options: SendMessageOptions = {}): Promise<ChatResponse> => {
       const delivery = options.delivery ?? "typed";
       const userMsg: ChatMessage = {
         id: uid(),
@@ -146,6 +146,11 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
         if (actions.length) {
           onActions?.(actions);
         }
+
+        return {
+          content: assistantContent,
+          actions,
+        };
       } catch {
         const errorMsg: ChatMessage = {
           id: uid(),
@@ -159,6 +164,11 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           messagesRef.current = next;
           return next;
         });
+
+        return {
+          content: "Sorry, I encountered an error. Please try asking again.",
+          actions: [],
+        };
       } finally {
         setIsLoading(false);
         setIsSpeaking(false);
