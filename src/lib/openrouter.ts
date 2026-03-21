@@ -31,7 +31,7 @@ export async function chatCompletion(
 ): Promise<string> {
   if (!hasApiKey()) {
     const prompt = messages[messages.length - 1]?.content ?? "";
-    return `Mock expert response: I can explain \"${prompt}\" in the context of this invention.`;
+    return `I'm currently operating in offline mode. For \"${prompt}\", I can tell you that this relates to the fundamental principles of the invention's design and history. To get more detailed AI-generated insights, please ensure the system is fully connected.`;
   }
 
   const response = await fetch(OPENROUTER_BASE_URL, {
@@ -102,7 +102,7 @@ export async function chatCompletionStream(
 ): Promise<ReadableStream<Uint8Array>> {
   if (!hasApiKey()) {
     const encoder = new TextEncoder();
-    const text = `Mock stream: Here's a contextual explanation for ${messages[messages.length - 1]?.content ?? "your question"}.`;
+    const text = `I'm currently providing a baseline explanation for ${messages[messages.length - 1]?.content ?? "your question"}. For more comprehensive, real-time responses, please check the system connection.`;
     return new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(encoder.encode(text));

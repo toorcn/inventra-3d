@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChatMessage } from "@/types";
+import ReactMarkdown from "react-markdown";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -18,7 +19,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "rounded-bl-md border border-white/5 bg-white/[0.06] text-gray-200"
         }`}
       >
-        {message.content}
+        <ReactMarkdown
+          components={{
+            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+            strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
       </div>
     </div>
   );

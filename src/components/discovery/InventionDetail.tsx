@@ -3,21 +3,9 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import type { Invention } from "@/types";
-import { ArrowLeft, Box } from "lucide-react";
-import Link from "next/link";
-
-interface InventionDetailProps {
-  invention: Invention;
-  onBack: () => void;
-}
-
-export function InventionDetail({ invention, onBack }: InventionDetailProps) {
-  return (
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import type { Invention } from "@/types";
 import { ArrowLeft, Box, Calendar, MapPin, User, FileText } from "lucide-react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 
 interface InventionDetailProps {
   invention: Invention;
@@ -27,6 +15,7 @@ interface InventionDetailProps {
 export function InventionDetail({ invention, onBack }: InventionDetailProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {/* Header section with back button and title */}
       <div className="border-b border-white/5 bg-white/[0.02] p-4">
         <button
           onClick={onBack}
@@ -44,77 +33,88 @@ export function InventionDetail({ invention, onBack }: InventionDetailProps) {
         </div>
       </div>
 
+      {/* Main content area */}
       <div className="flex-1 overflow-y-auto p-4 py-6">
+        {/* Quick info grid */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] p-3">
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] p-3 shadow-sm transition-colors hover:bg-white/[0.05]">
             <Calendar className="size-4 text-blue-400" />
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">Year</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Year</p>
               <p className="text-sm font-semibold text-white">{invention.year}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] p-3">
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] p-3 shadow-sm transition-colors hover:bg-white/[0.05]">
             <MapPin className="size-4 text-cyan-400" />
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">Country</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Country</p>
               <p className="text-sm font-semibold text-white truncate">{invention.country}</p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <section>
+        {/* Detailed sections */}
+        <div className="space-y-8">
+          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-blue-500/50 before:to-transparent">
             <div className="mb-2 flex items-center gap-2 text-[var(--text-secondary)]">
-              <User className="size-4" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider">Inventors</h3>
+              <User className="size-3.5" />
+              <h3 className="text-[10px] font-bold uppercase tracking-widest">Key Inventors</h3>
             </div>
-            <p className="text-sm leading-relaxed text-gray-100">
+            <p className="text-sm leading-relaxed text-gray-100 font-medium">
               {invention.inventors.join(", ")}
             </p>
           </section>
 
-          <section>
+          <section className="relative pl-6 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-cyan-500/50 before:to-transparent">
             <div className="mb-2 flex items-center gap-2 text-[var(--text-secondary)]">
-              <FileText className="size-4" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider">Description</h3>
+              <FileText className="size-3.5" />
+              <h3 className="text-[10px] font-bold uppercase tracking-widest">Invention Story</h3>
             </div>
-            <p className="text-base leading-relaxed text-gray-300 antialiased">
-              {invention.description}
-            </p>
+            <div className="text-[15px] leading-relaxed text-gray-300 antialiased font-normal">
+              <ReactMarkdown 
+                components={{
+                  p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                }}
+              >
+                {invention.description}
+              </ReactMarkdown>
+            </div>
           </section>
 
           {invention.patentNumber && (
-            <div className="mt-8 rounded-xl border border-blue-500/10 bg-blue-500/5 p-4 ring-1 ring-blue-500/20">
-              <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-blue-400">
-                Official Patent
+            <div className="mt-10 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 ring-1 ring-blue-500/10 shadow-inner">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400/80">Historical Record</span>
+                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[8px] font-bold uppercase text-blue-300">Patent Confirmed</span>
               </div>
-              <div className="text-lg font-mono font-bold tracking-tight text-white">
-                {invention.patentNumber}
+              <div className="flex items-baseline gap-2">
+                <span className="text-[10px] font-mono text-blue-400/60 uppercase">No.</span>
+                <div className="text-xl font-mono font-bold tracking-tighter text-white">
+                  {invention.patentNumber}
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="border-t border-white/5 bg-white/[0.02] p-4">
+      {/* Footer action section */}
+      <div className="border-t border-white/5 bg-white/[0.04] p-4 backdrop-blur-md">
         {invention.hasModel ? (
           <Link href={`/invention/${invention.id}`}>
-            <Button className="w-full gap-2 py-6 text-base shadow-[var(--glow-blue)]">
+            <Button className="w-full gap-2 py-6 text-base font-bold shadow-[0_0_20px_-5px_var(--color-blue-500)] hover:scale-[1.02] transition-transform active:scale-[0.98]">
               <Box className="size-5" />
               Explore in 3D
             </Button>
           </Link>
         ) : (
           <Link href={`/invention/${invention.id}`}>
-            <Button variant="secondary" className="w-full py-6 text-base">
-              View Detailed Concept
+            <Button variant="secondary" className="w-full py-6 text-base font-bold hover:bg-white/10 transition-colors">
+              Read Detailed Brief
             </Button>
           </Link>
         )}
       </div>
     </div>
-  );
-}
-
   );
 }
