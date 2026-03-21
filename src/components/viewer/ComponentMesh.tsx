@@ -45,22 +45,25 @@ export function ComponentMesh({ model, isSelected, highlight, onSelect }: Compon
 
   const isHighlighted = Boolean(highlight);
   const scaleBase = hovered ? 1.04 : 1;
+  const accentColor = isSelected ? "#60a5fa" : (highlight?.color ?? "#38bdf8");
   const emissiveColor = isSelected
-    ? "#3b82f6"
+    ? accentColor
     : isHighlighted
-      ? (highlight?.color ?? "#38bdf8")
+      ? accentColor
       : hovered
         ? (model.emissive ?? model.color)
         : (model.emissive ?? "#000000");
-  const emissiveBase = isSelected ? 0.6 : isHighlighted ? 0.45 : hovered ? 0.3 : (model.emissiveIntensity ?? 0);
+  const emissiveBase = isSelected ? 0.95 : isHighlighted ? 0.7 : hovered ? 0.3 : (model.emissiveIntensity ?? 0);
   const isPulsing = isHighlighted && highlight?.mode === "pulse" && !isSelected;
   const { pulse } = useSpring({
     pulse: isPulsing ? 1 : 0,
     loop: isPulsing ? { reverse: true } : false,
     config: { tension: 120, friction: 14 },
   });
-  const animatedScale = pulse.to((p) => scaleBase * (1 + p * 0.05));
-  const animatedEmissiveIntensity = pulse.to((p) => emissiveBase + p * 0.35);
+  const animatedScale = pulse.to((p) => scaleBase * (1 + p * (isHighlighted ? 0.08 : 0.05)));
+  const animatedEmissiveIntensity = pulse.to((p) => emissiveBase + p * 0.55);
+  const haloScale = pulse.to((p) => scaleBase * (isHighlighted ? 1.12 + p * 0.08 : 1.02 + p * 0.03));
+  const haloOpacity = pulse.to((p) => (isHighlighted ? 0.2 + p * 0.28 : 0));
 
   if (model.geometry.type === "roundedBox") {
     const [w = 1, h = 1, d = 1] = model.geometry.args;
@@ -76,6 +79,22 @@ export function ComponentMesh({ model, isSelected, highlight, onSelect }: Compon
         onPointerOut={() => setHovered(false)}
         onClick={handleClick}
       >
+        {isHighlighted ? (
+          <AnimatedRoundedBox
+            args={[w, h, d]}
+            radius={0.07}
+            smoothness={4}
+            scale={haloScale}
+            rotation={model.rotation ?? [0, 0, 0]}
+          >
+            <animated.meshBasicMaterial
+              color={accentColor}
+              transparent
+              opacity={haloOpacity}
+              depthWrite={false}
+            />
+          </AnimatedRoundedBox>
+        ) : null}
         <animated.meshStandardMaterial
           color={model.color}
           metalness={model.metalness ?? 0.35}
@@ -97,6 +116,17 @@ export function ComponentMesh({ model, isSelected, highlight, onSelect }: Compon
       onPointerOut={() => setHovered(false)}
       onClick={handleClick}
     >
+      {isHighlighted ? (
+        <animated.mesh scale={haloScale}>
+          <GeometryFromDef def={model.geometry} />
+          <animated.meshBasicMaterial
+            color={accentColor}
+            transparent
+            opacity={haloOpacity}
+            depthWrite={false}
+          />
+        </animated.mesh>
+      ) : null}
       <GeometryFromDef def={model.geometry} />
       <animated.meshStandardMaterial
         color={model.color}
