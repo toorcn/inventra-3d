@@ -217,6 +217,19 @@ export interface GlobeViewState {
   altitude: number;
 }
 
+export interface ViewerTransform {
+  rotationX: number;
+  rotationY: number;
+}
+
+export type GestureControlStatus =
+  | "idle"
+  | "starting"
+  | "tracking"
+  | "blocked"
+  | "unsupported"
+  | "error";
+
 export interface ExplodedViewState {
   isExploded: boolean;
   selectedComponentId: string | null;

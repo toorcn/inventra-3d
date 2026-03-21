@@ -9,8 +9,13 @@ import { Badge } from "@/components/ui/Badge";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
 import { useExpert } from "@/hooks/useExpert";
+import { useGestureControls } from "@/hooks/useGestureControls";
 import { useVoiceSession } from "@/hooks/useVoiceSession";
-import type { ExpertAction, TranscriptDelivery } from "@/types";
+import {
+  DEFAULT_VIEWER_TRANSFORM,
+  applySmoothedRotation,
+} from "@/lib/gesture-controls";
+import type { ExpertAction, TranscriptDelivery, ViewerTransform } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
@@ -44,6 +49,10 @@ export default function InventionDetailPage() {
   const [componentSelectionNonce, setComponentSelectionNonce] = useState(0);
   const [highlightMap, setHighlightMap] = useState<HighlightMap>({});
   const [beamEffect, setBeamEffect] = useState<BeamEffect | null>(null);
+  const [gestureEnabled, setGestureEnabled] = useState(false);
+  const [viewerTransform, setViewerTransform] = useState<ViewerTransform>(
+    DEFAULT_VIEWER_TRANSFORM,
+  );
   const timeoutsRef = useRef<number[]>([]);
   const componentSelectionNonceRef = useRef(0);
 
@@ -72,6 +81,14 @@ export default function InventionDetailPage() {
     setComponentSelectionNonce(nextNonce);
     return nextNonce;
   }, []);
+
+  const handleViewerReset = useCallback(() => {
+    setIsExploded(false);
+    handleComponentSelect(null);
+    setHighlightMap({});
+    setBeamEffect(null);
+    setViewerTransform(DEFAULT_VIEWER_TRANSFORM);
+  }, [handleComponentSelect]);
 
   const handleExpertActions = useCallback(
     (actions: ExpertAction[]) => {
@@ -129,10 +146,7 @@ export default function InventionDetailPage() {
         }
 
         if (action.type === "reset") {
-          setIsExploded(false);
-          handleComponentSelect(null);
-          setHighlightMap({});
-          setBeamEffect(null);
+          handleViewerReset();
           return;
         }
 
@@ -158,7 +172,7 @@ export default function InventionDetailPage() {
         }
       });
     },
-    [componentIdSet, handleComponentSelect, invention.hasModel],
+    [componentIdSet, handleComponentSelect, handleViewerReset, invention.hasModel],
   );
 
   const {
@@ -185,6 +199,15 @@ export default function InventionDetailPage() {
   useEffect(() => {
     setVoiceSessionId(voice.sessionId);
   }, [voice.sessionId]);
+
+  const gestureControls = useGestureControls({
+    enabled: invention.hasModel && gestureEnabled,
+    onAssemble: () => setIsExploded(false),
+    onExplode: () => setIsExploded(true),
+    onRotate: (delta) => {
+      setViewerTransform((current) => applySmoothedRotation(current, delta));
+    },
+  });
 
   const handleConversationTurn = useCallback(
     async (content: string, options?: { delivery?: TranscriptDelivery }) =>
@@ -218,6 +241,8 @@ export default function InventionDetailPage() {
                 <ModelViewer
                   inventionId={invention.id}
                   isExploded={isExploded}
+                  viewerTransform={viewerTransform}
+                  gestureTrackingActive={gestureControls.status === "tracking"}
                   selectedComponentId={selectedComponentId}
                   highlightMap={highlightMap}
                   beamEffect={beamEffect}
@@ -242,12 +267,14 @@ export default function InventionDetailPage() {
               </div>
 
               <ViewerControls
+                gestureEnabled={gestureEnabled}
+                gestureError={gestureControls.error}
+                gestureStatus={gestureControls.status}
+                gestureVideoRef={gestureControls.videoRef}
                 isExploded={isExploded}
+                onToggleGestures={() => setGestureEnabled((current) => !current)}
                 onToggleExplode={() => setIsExploded((prev) => !prev)}
-                onReset={() => {
-                  setIsExploded(false);
-                  handleComponentSelect(null);
-                }}
+                onReset={handleViewerReset}
               />
               {selectedComponentId && (
                 <ComponentInfo

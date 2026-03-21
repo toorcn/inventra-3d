@@ -11,6 +11,7 @@
     "test:fal-trellis": "node scripts/fal-trellis-test.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.17",
     "@react-spring/three": "^10.0.3",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
