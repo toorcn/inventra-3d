@@ -226,11 +226,11 @@ export async function processVoiceWebhookTurnStreaming({
     [
       {
         role: "system",
-        content: `${systemPrompt}\n\nIMPORTANT: You are speaking aloud to the user. Reply with natural conversational prose only — no raw tool syntax, JSON, or action markers in your words. When asked to perform 3D viewer actions (explode, highlight, select a component, assemble, etc.) describe what you are doing naturally, for example "Let me explode the view so you can see each component." The viewer actions are executed automatically in parallel with your response.`,
+        content: `${systemPrompt}\n\nIMPORTANT: You are speaking aloud to the user. Keep replies short and conversational — 1 to 3 sentences max. Be punchy and interactive, like a knowledgeable friend, not a lecturer. No raw tool syntax, JSON, or action markers in your words. When performing 3D viewer actions describe them naturally, e.g. "Let me explode the view so you can see each part." Actions execute automatically in parallel.`,
       },
       ...messagesForLlm,
     ],
-    { max_tokens: 700, temperature: 0.2 },
+    { max_tokens: 200, temperature: 0.4 },
   );
 
   let fullContent = "";

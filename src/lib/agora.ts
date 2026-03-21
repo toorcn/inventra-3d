@@ -174,7 +174,7 @@ export function buildAgoraAgentJoinPayload(
         request_timeout_ms: 25000,
         params: {
           model: DEFAULT_OPENROUTER_MODEL,
-          max_tokens: 700,
+          max_tokens: 200,
           temperature: 0.2,
         },
       },
