@@ -37,14 +37,14 @@ export function InventionDetail({ invention, onBack }: InventionDetailProps) {
       <div className="flex-1 overflow-y-auto p-4 py-6">
         {/* Quick info grid */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] p-3 shadow-sm transition-colors hover:bg-white/[0.05]">
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 shadow-sm transition-colors hover:bg-white/[0.04]">
             <Calendar className="size-4 text-blue-400" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Year</p>
               <p className="text-sm font-semibold text-white">{invention.year}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] p-3 shadow-sm transition-colors hover:bg-white/[0.05]">
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 shadow-sm transition-colors hover:bg-white/[0.04]">
             <MapPin className="size-4 text-cyan-400" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)] opacity-70">Country</p>

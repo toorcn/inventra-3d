@@ -89,6 +89,11 @@ export function useExpert({ inventionId, componentId }: UseExpertProps) {
           }),
         });
 
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText);
+        }
+
         const text = await response.text();
 
         const assistantMsg: ChatMessage = {
@@ -99,11 +104,15 @@ export function useExpert({ inventionId, componentId }: UseExpertProps) {
         };
 
         setMessages((prev) => [...prev, assistantMsg]);
-      } catch {
+      } catch (error) {
+        const apiError = error instanceof Error ? error.message : "";
+        const missingKey = apiError.includes("OPENROUTER_API_KEY");
         const errorMsg: ChatMessage = {
           id: uid(),
           role: "assistant",
-          content: "Sorry, I encountered an error. Please try asking again.",
+          content: missingKey
+            ? "AI Expert is unavailable because OPENROUTER_API_KEY is not configured. Please add a valid OpenRouter API key."
+            : "Sorry, I encountered an error. Please try asking again.",
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, errorMsg]);

@@ -30,8 +30,7 @@ export async function chatCompletion(
   options: CompletionOptions = {},
 ): Promise<string> {
   if (!hasApiKey()) {
-    const prompt = messages[messages.length - 1]?.content ?? "";
-    return `I'm currently operating in offline mode. For \"${prompt}\", I can tell you that this relates to the fundamental principles of the invention's design and history. To get more detailed AI-generated insights, please ensure the system is fully connected.`;
+    throw new Error("OPENROUTER_API_KEY is required for AI chat responses.");
   }
 
   const response = await fetch(OPENROUTER_BASE_URL, {
@@ -101,14 +100,7 @@ export async function chatCompletionStream(
   options: CompletionOptions = {},
 ): Promise<ReadableStream<Uint8Array>> {
   if (!hasApiKey()) {
-    const encoder = new TextEncoder();
-    const text = `I'm currently providing a baseline explanation for ${messages[messages.length - 1]?.content ?? "your question"}. For more comprehensive, real-time responses, please check the system connection.`;
-    return new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode(text));
-        controller.close();
-      },
-    });
+    throw new Error("OPENROUTER_API_KEY is required for AI chat responses.");
   }
 
   const response = await fetch(OPENROUTER_BASE_URL, {

@@ -32,6 +32,9 @@ const GLOBE_TEXTURE_URL =
 const SKY_TEXTURE_URL =
   "https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/night-sky.png";
 
+const AUTO_ROTATE_SPEED = 0.4;
+const RESUME_DELAY_MS = 3000;
+
 export default function GlobeClient({
   inventions,
   categories,
@@ -44,10 +47,44 @@ export default function GlobeClient({
   const localRef = useRef<GlobeMethods | undefined>(undefined);
   const [geoCountries, setGeoCountries] = useState<GeoFeature[]>([]);
   const [hoverCountry, setHoverCountry] = useState<GeoFeature | null>(null);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (globeRef && localRef.current) globeRef.current = localRef.current;
   });
+
+  // Enable auto-rotation after the globe initialises
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const controls = localRef.current?.controls() as
+        | { autoRotate: boolean; autoRotateSpeed: number }
+        | undefined;
+      if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = AUTO_ROTATE_SPEED;
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Pause rotation on user interaction, then resume after a delay
+  const pauseRotation = () => {
+    const controls = localRef.current?.controls() as
+      | { autoRotate: boolean }
+      | undefined;
+    if (controls) controls.autoRotate = false;
+
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => {
+      const c = localRef.current?.controls() as
+        | { autoRotate: boolean; autoRotateSpeed: number }
+        | undefined;
+      if (c) {
+        c.autoRotate = true;
+        c.autoRotateSpeed = AUTO_ROTATE_SPEED;
+      }
+    }, RESUME_DELAY_MS);
+  };
 
   useEffect(() => {
     fetch(GEOJSON_URL)
@@ -67,7 +104,10 @@ export default function GlobeClient({
   const markers = useMemo(() => inventionsToMarkers(filtered, categories), [filtered, categories]);
 
   return (
-    <div className="h-full min-h-[520px] w-full overflow-hidden">
+    <div
+      className="h-full min-h-[520px] w-full overflow-hidden"
+      onPointerDown={pauseRotation}
+    >
       <Globe
         ref={localRef as React.MutableRefObject<GlobeMethods | undefined>}
         globeImageUrl={GLOBE_TEXTURE_URL}
@@ -83,6 +123,7 @@ export default function GlobeClient({
           setHoverCountry((feature as GeoFeature | null) ?? null)
         }
         onPolygonClick={(feature: object) => {
+          pauseRotation();
           const code = (feature as GeoFeature).properties.ISO_A2;
           if (code) onCountryClick(code);
         }}
@@ -97,7 +138,10 @@ export default function GlobeClient({
         labelAltitude={(m: object) =>
           (m as (typeof markers)[number]).id === selectedInventionId ? 0.08 : 0.02
         }
-        onLabelClick={(m: object) => onInventionClick((m as (typeof markers)[number]).id)}
+        onLabelClick={(m: object) => {
+          pauseRotation();
+          onInventionClick((m as (typeof markers)[number]).id);
+        }}
       />
     </div>
   );

@@ -40,15 +40,17 @@ export default function Home() {
 
       <DemoMode running={demoRunning} onStop={() => setDemoRunning(false)} />
 
-      <Globe
-        inventions={inventionState.filtered}
-        categories={categories}
-        activeCategories={inventionState.activeCategories}
-        selectedInventionId={inventionState.selectedInvention?.id ?? null}
-        onCountryClick={interaction.handleCountryClick}
-        onInventionClick={interaction.handleInventionClick}
-        globeRef={globeRef}
-      />
+      <div className="absolute inset-0 pr-[26rem]">
+        <Globe
+          inventions={inventionState.filtered}
+          categories={categories}
+          activeCategories={inventionState.activeCategories}
+          selectedInventionId={inventionState.selectedInvention?.id ?? null}
+          onCountryClick={interaction.handleCountryClick}
+          onInventionClick={interaction.handleInventionClick}
+          globeRef={globeRef}
+        />
+      </div>
 
       <div className="pointer-events-none absolute right-4 top-4 z-20 h-[calc(100vh-2rem)]">
         <SidePanel
