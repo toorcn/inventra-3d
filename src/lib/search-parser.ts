@@ -3,12 +3,10 @@ import type { CategoryId, SearchFilters } from "@/types";
 import { structuredOutput } from "./openrouter";
 
 const CATEGORY_KEYWORDS: Record<CategoryId, string[]> = {
-  technology: ["technology", "tech", "hardware", "radio", "telephone", "compass"],
-  biology: ["biology", "biotech", "bio", "genetic", "medical", "health"],
-  energy: ["energy", "renewable", "solar", "battery", "power", "electric"],
-  materials: ["materials", "material", "kevlar", "carbon", "polymer", "alloy"],
-  computing: ["computing", "computer", "software", "chip", "internet", "ai"],
-  transportation: ["transportation", "transport", "vehicle", "train", "aviation", "flight"],
+  communications: ["communications", "telephone", "phone", "radio", "telegraph", "signal"],
+  optics: ["optics", "telescope", "lens", "light", "microscope", "vision"],
+  mechanical: ["mechanical", "engine", "steam", "gear", "machine", "piston"],
+  "consumer-electronics": ["electronics", "iphone", "smartphone", "device", "mobile", "gadget"],
 };
 
 const REGIONS = ["Europe", "Asia", "North America", "South America", "Africa", "Oceania"];
@@ -92,7 +90,7 @@ export async function parseSearchQuery(query: string): Promise<SearchFilters> {
           type: "array",
           items: {
             type: "string",
-            enum: ["technology", "biology", "energy", "materials", "computing", "transportation"],
+            enum: ["communications", "optics", "mechanical", "consumer-electronics"],
           },
         },
         region: { type: "string" },

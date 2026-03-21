@@ -1,23 +1,26 @@
 export type CategoryId =
-  | "technology"
-  | "biology"
-  | "energy"
-  | "materials"
-  | "computing"
-  | "transportation";
+  | "communications"
+  | "optics"
+  | "mechanical"
+  | "consumer-electronics";
 
 export interface Invention {
   id: string;
   title: string;
   year: number;
   inventors: string[];
-  location: { lat: number; lng: number };
+  location: { lat: number; lng: number; label: string };
   country: string;
   countryCode: string;
   category: CategoryId;
   description: string;
   patentNumber: string | null;
   hasModel: boolean;
+  inventionDate: number;
+  patentDate: number | null;
+  commercialisationDate: number;
+  avatarPersona: string;
+  avatarVoiceStyle: string;
 }
 
 export interface GeometryDef {
@@ -33,7 +36,9 @@ export interface InventionComponent {
   description: string;
   materials: string[];
   patentText: string | null;
-  geometry: GeometryDef;
+  file: string;
+  offset: [number, number, number];
+  geometry?: GeometryDef;
   assembledPosition: [number, number, number];
   explodedPosition: [number, number, number];
   color: string;

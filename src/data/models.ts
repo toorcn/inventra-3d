@@ -3,7 +3,7 @@ import type { GeometryDef } from "@/types";
 
 export interface ComponentModel {
   componentId: string;
-  geometry: GeometryDef;
+  geometry?: GeometryDef;
   assembledPosition: [number, number, number];
   explodedPosition: [number, number, number];
   rotation?: [number, number, number];
@@ -30,22 +30,22 @@ function buildComponentModels(inventionId: string): ComponentModel[] {
     geometry: component.geometry,
     assembledPosition: component.assembledPosition,
     explodedPosition: component.explodedPosition,
-    rotation: component.geometry.rotation,
+    rotation: component.geometry?.rotation,
     color: component.color,
     metalness: 0.35,
     roughness: 0.45,
-    transparent: component.id.includes("envelope"),
-    opacity: component.id.includes("envelope") ? 0.45 : 1,
-    emissive:
-      component.id.includes("filament") || component.id.includes("spark")
-        ? "#f59e0b"
-        : undefined,
-    emissiveIntensity:
-      component.id.includes("filament") || component.id.includes("spark") ? 0.4 : 0,
+    transparent: false,
+    opacity: 1,
   }));
 }
 
 export const modelDefinitions: ModelDefinition[] = [
+  {
+    inventionId: "telephone",
+    components: buildComponentModels("telephone"),
+    cameraPosition: [0, 1.0, 4],
+    cameraTarget: [0, 0, 0],
+  },
   {
     inventionId: "iphone",
     components: buildComponentModels("iphone"),
@@ -53,28 +53,16 @@ export const modelDefinitions: ModelDefinition[] = [
     cameraTarget: [0, 0, 0],
   },
   {
-    inventionId: "light-bulb",
-    components: buildComponentModels("light-bulb"),
-    cameraPosition: [0, 1.2, 4],
-    cameraTarget: [0, 0.4, 0],
-  },
-  {
-    inventionId: "tesla-coil",
-    components: buildComponentModels("tesla-coil"),
-    cameraPosition: [0, 1.8, 5],
-    cameraTarget: [0, 0.8, 0],
-  },
-  {
-    inventionId: "wright-flyer",
-    components: buildComponentModels("wright-flyer"),
-    cameraPosition: [0, 1.4, 6],
-    cameraTarget: [0, 0.3, 0],
-  },
-  {
     inventionId: "steam-engine",
     components: buildComponentModels("steam-engine"),
     cameraPosition: [0, 1.2, 5],
     cameraTarget: [0, 0.4, 0],
+  },
+  {
+    inventionId: "telescope",
+    components: buildComponentModels("telescope"),
+    cameraPosition: [0, 0.5, 5],
+    cameraTarget: [0, 0, 0],
   },
 ];
 

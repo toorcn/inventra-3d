@@ -1,17 +1,10 @@
 import type { Category, CategoryId } from "@/types";
 
 export const categories: Category[] = [
-  { id: "technology", name: "Technology", color: "#3B82F6", icon: "Cpu" },
-  { id: "biology", name: "Biology", color: "#10B981", icon: "Dna" },
-  { id: "energy", name: "Energy", color: "#F59E0B", icon: "Zap" },
-  { id: "materials", name: "Materials", color: "#8B5CF6", icon: "Gem" },
-  { id: "computing", name: "Computing", color: "#EC4899", icon: "Monitor" },
-  {
-    id: "transportation",
-    name: "Transportation",
-    color: "#EF4444",
-    icon: "Plane",
-  },
+  { id: "communications", name: "Communications", color: "#2563EB", icon: "Phone" },
+  { id: "optics", name: "Optics", color: "#8B5CF6", icon: "Telescope" },
+  { id: "mechanical", name: "Mechanical", color: "#F59E0B", icon: "Cog" },
+  { id: "consumer-electronics", name: "Consumer Electronics", color: "#EC4899", icon: "Smartphone" },
 ];
 
 export const categoryColorMap: Record<CategoryId, string> = categories.reduce(

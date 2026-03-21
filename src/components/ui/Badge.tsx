@@ -1,21 +1,17 @@
 import type { CategoryId } from "@/types";
 
 const categoryLabelMap: Record<CategoryId, string> = {
-  technology: "Technology",
-  biology: "Biology",
-  energy: "Energy",
-  materials: "Materials",
-  computing: "Computing",
-  transportation: "Transportation",
+  communications: "Communications",
+  optics: "Optics",
+  mechanical: "Mechanical",
+  "consumer-electronics": "Consumer Electronics",
 };
 
 const categoryColorMap: Record<CategoryId, string> = {
-  technology: "#3B82F6",
-  biology: "#10B981",
-  energy: "#F59E0B",
-  materials: "#8B5CF6",
-  computing: "#EC4899",
-  transportation: "#EF4444",
+  communications: "#2563EB",
+  optics: "#8B5CF6",
+  mechanical: "#F59E0B",
+  "consumer-electronics": "#EC4899",
 };
 
 interface BadgeProps {

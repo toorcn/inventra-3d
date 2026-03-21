@@ -49,7 +49,7 @@ export function ComponentMesh({ model, isSelected, onSelect }: ComponentMeshProp
       : (model.emissive ?? "#000000");
   const emissiveIntensity = isSelected ? 0.6 : hovered ? 0.3 : (model.emissiveIntensity ?? 0);
 
-  if (model.geometry.type === "roundedBox") {
+  if (model.geometry?.type === "roundedBox") {
     const [w = 1, h = 1, d = 1] = model.geometry.args;
     return (
       <RoundedBox
@@ -83,7 +83,7 @@ export function ComponentMesh({ model, isSelected, onSelect }: ComponentMeshProp
       onPointerOut={() => setHovered(false)}
       onClick={handleClick}
     >
-      <GeometryFromDef def={model.geometry} />
+      {model.geometry && <GeometryFromDef def={model.geometry} />}
       <meshStandardMaterial
         color={model.color}
         metalness={model.metalness ?? 0.35}
