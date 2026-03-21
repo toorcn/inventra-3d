@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 interface UseExpertProps {
   inventionId: string;
   componentId?: string | null;
+  activeVoiceSessionId?: string | null;
   onActions?: (actions: ExpertAction[]) => void;
 }
 
@@ -61,17 +62,19 @@ function buildSuggestedQuestions(inventionId: string, componentId?: string | nul
   return base;
 }
 
-export function useExpert({ inventionId, componentId, onActions }: UseExpertProps) {
+export function useExpert({ inventionId, componentId, activeVoiceSessionId, onActions }: UseExpertProps) {
   const invention = getInventionById(inventionId);
   const introMessage: ChatMessage = useMemo(() => createIntroMessage(invention), [invention]);
   const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesRef = useRef<ChatMessage[]>([introMessage]);
+  const messageIdsRef = useRef<Set<string>>(new Set([introMessage.id]));
 
   useEffect(() => {
     const next = [introMessage];
     messagesRef.current = next;
+    messageIdsRef.current = new Set([introMessage.id]);
     setMessages(next);
   }, [introMessage]);
 
@@ -80,19 +83,35 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
     [inventionId, componentId],
   );
 
-  const appendMessage = useCallback((message: AppendMessageOptions) => {
-    const nextMessage: ChatMessage = {
-      id: uid(),
-      timestamp: Date.now(),
-      ...message,
-    };
+  const appendServerMessages = useCallback((incomingMessages: ChatMessage[]) => {
+    const deduped = incomingMessages.filter((message) => !messageIdsRef.current.has(message.id));
 
-    setMessages((prev) => {
-      const next = [...prev, nextMessage];
-      messagesRef.current = next;
-      return next;
+    if (deduped.length === 0) {
+      return messagesRef.current;
+    }
+
+    deduped.forEach((message) => {
+      messageIdsRef.current.add(message.id);
     });
+
+    const next = [...messagesRef.current, ...deduped];
+    messagesRef.current = next;
+    setMessages(next);
+    return next;
   }, []);
+
+  const appendMessage = useCallback(
+    (message: AppendMessageOptions) => {
+      const nextMessage: ChatMessage = {
+        id: uid(),
+        timestamp: Date.now(),
+        ...message,
+      };
+
+      appendServerMessages([nextMessage]);
+    },
+    [appendServerMessages],
+  );
 
   const sendMessage = useCallback(
     async (content: string, options: SendMessageOptions = {}): Promise<ChatResponse> => {
@@ -105,9 +124,7 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
         timestamp: Date.now(),
       };
 
-      const conversation = [...messagesRef.current, userMsg];
-      messagesRef.current = conversation;
-      setMessages(conversation);
+      const conversation = appendServerMessages([userMsg]);
       setIsLoading(true);
       setIsSpeaking(true);
 
@@ -117,8 +134,10 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             inventionId,
-            componentId: componentId ?? undefined,
+            componentId: componentId ?? null,
             messages: conversation,
+            sessionId: activeVoiceSessionId ?? undefined,
+            clientMessageId: userMsg.id,
           }),
         });
 
@@ -127,10 +146,11 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           throw new Error(payload.error);
         }
 
-        const { content: assistantContent, actions } = payload as ChatResponse;
+        const chatPayload = payload as ChatResponse;
+        const { content: assistantContent, actions } = chatPayload;
 
         const assistantMsg: ChatMessage = {
-          id: uid(),
+          id: chatPayload.assistantMessageId ?? uid(),
           role: "assistant",
           content: assistantContent,
           actions: actions.length ? actions : undefined,
@@ -138,11 +158,7 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           timestamp: Date.now(),
         };
 
-        setMessages((prev) => {
-          const next = [...prev, assistantMsg];
-          messagesRef.current = next;
-          return next;
-        });
+        appendServerMessages([assistantMsg]);
         if (actions.length) {
           onActions?.(actions);
         }
@@ -159,11 +175,7 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           delivery,
           timestamp: Date.now(),
         };
-        setMessages((prev) => {
-          const next = [...prev, errorMsg];
-          messagesRef.current = next;
-          return next;
-        });
+        appendServerMessages([errorMsg]);
 
         return {
           content: "Sorry, I encountered an error. Please try asking again.",
@@ -174,17 +186,19 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
         setIsSpeaking(false);
       }
     },
-    [inventionId, componentId, onActions],
+    [activeVoiceSessionId, appendServerMessages, componentId, inventionId, onActions],
   );
 
   const clearMessages = useCallback(() => {
     const next = [introMessage];
     messagesRef.current = next;
+    messageIdsRef.current = new Set([introMessage.id]);
     setMessages(next);
   }, [introMessage]);
 
   return {
     appendMessage,
+    appendServerMessages,
     messages,
     isLoading,
     isSpeaking,

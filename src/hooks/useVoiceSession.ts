@@ -1,335 +1,448 @@
 "use client";
 
-import type { ChatResponse, VoiceTranscribeResponse } from "@/types";
+import type {
+  ChatMessage,
+  ExpertAction,
+  VoiceSessionEvent,
+  VoiceSessionPollResponse,
+  VoiceSessionResponse,
+  VoiceSessionStatus,
+} from "@/types";
+import type { IAgoraRTCClient, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type VoiceStatus = "idle" | "recording" | "transcribing" | "speaking" | "error";
-
 interface UseVoiceSessionProps {
-  onSpokenTurn: (content: string) => Promise<ChatResponse>;
+  inventionId: string;
+  componentId?: string | null;
+  onMessages?: (messages: ChatMessage[]) => void;
+  onActions?: (actions: ExpertAction[]) => void;
 }
 
-type RecordedTurn = {
-  token: number;
-  blob: Blob;
-};
+type AgoraModule = typeof import("agora-rtc-sdk-ng");
 
-function pickRecorderMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") {
-    return undefined;
+export type VoiceStatus = VoiceSessionStatus;
+
+function decodeStreamPayload(payload: Uint8Array | string): string {
+  if (typeof payload === "string") {
+    return payload;
   }
 
-  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
-  return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+  return new TextDecoder().decode(payload);
 }
 
-async function readErrorMessage(response: Response): Promise<string> {
-  const contentType = response.headers.get("content-type") ?? "";
+function toVoiceStatus(value: unknown): VoiceSessionStatus | null {
+  return value === "disabled" ||
+    value === "idle" ||
+    value === "connecting" ||
+    value === "connected" ||
+    value === "listening" ||
+    value === "thinking" ||
+    value === "speaking" ||
+    value === "disconnecting" ||
+    value === "error"
+    ? value
+    : null;
+}
 
-  if (contentType.includes("application/json")) {
-    const payload = (await response.json()) as { error?: string };
-    return payload.error ?? response.statusText;
+function readErrorMessage(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+    return payload.error;
   }
 
-  return response.text();
+  return fallback;
 }
 
-export function useVoiceSession({ onSpokenTurn }: UseVoiceSessionProps) {
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const recordingRef = useRef<MediaRecorder | null>(null);
-  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
-  const playbackUrlRef = useRef<string | null>(null);
-  const sessionTokenRef = useRef(0);
-  const sessionCounterRef = useRef(0);
-  const turnBufferRef = useRef<BlobPart[]>([]);
-  const turnRecorderMimeTypeRef = useRef<string | undefined>(undefined);
+function parseRtcVoiceEvent(
+  payload: Uint8Array | string,
+): { partialTranscript?: string | null; status?: VoiceSessionStatus } | null {
+  try {
+    const raw = JSON.parse(decodeStreamPayload(payload)) as Record<string, unknown>;
+    const eventName = String(raw.type ?? raw.event ?? raw.kind ?? "").toLowerCase();
+    const textValue =
+      typeof raw.text === "string"
+        ? raw.text
+        : typeof raw.content === "string"
+          ? raw.content
+          : typeof raw.message === "string"
+            ? raw.message
+            : null;
+    const isFinal = raw.final === true || raw.isFinal === true || raw.is_final === true;
 
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<VoiceStatus>("idle");
-
-  const stopPlayback = useCallback(() => {
-    const audio = playbackAudioRef.current;
-    const playbackUrl = playbackUrlRef.current;
-
-    playbackAudioRef.current = null;
-    playbackUrlRef.current = null;
-
-    if (audio) {
-      audio.pause();
-      audio.src = "";
+    if (eventName.includes("thinking")) {
+      return { status: "thinking" };
     }
 
-    if (playbackUrl) {
-      URL.revokeObjectURL(playbackUrl);
+    if (eventName.includes("speaking")) {
+      return { status: "speaking" };
+    }
+
+    if (eventName.includes("listening")) {
+      return { status: "listening" };
+    }
+
+    if (textValue && (eventName.includes("temp") || eventName.includes("interim"))) {
+      return { partialTranscript: textValue, status: "listening" };
+    }
+
+    if (textValue && eventName.includes("transcript")) {
+      return { partialTranscript: isFinal ? null : textValue };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function useVoiceSession({
+  inventionId,
+  componentId,
+  onMessages,
+  onActions,
+}: UseVoiceSessionProps) {
+  const agoraModuleRef = useRef<AgoraModule | null>(null);
+  const clientRef = useRef<IAgoraRTCClient | null>(null);
+  const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
+  const cursorRef = useRef(0);
+  const sessionIdRef = useRef<string | null>(null);
+  const pollIntervalRef = useRef(1200);
+  const destroyedRef = useRef(false);
+
+  const [error, setError] = useState<string | null>(null);
+  const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [status, setStatus] = useState<VoiceSessionStatus>("idle");
+
+  const stopPolling = useCallback(() => {
+    if (pollTimeoutRef.current !== null) {
+      window.clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
     }
   }, []);
 
-  const cleanupMedia = useCallback(() => {
-    const recorder = recordingRef.current;
-    if (recorder && recorder.state !== "inactive") {
+  const teardownRtc = useCallback(async () => {
+    const localTrack = localAudioTrackRef.current;
+    const client = clientRef.current;
+
+    localAudioTrackRef.current = null;
+    clientRef.current = null;
+
+    if (localTrack) {
       try {
-        recorder.stop();
+        localTrack.stop();
+        localTrack.close();
       } catch {
-        // Ignore recorder shutdown errors during cleanup.
+        // Ignore RTC teardown errors during cleanup.
       }
     }
-    recordingRef.current = null;
-    stopPlayback();
 
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    mediaStreamRef.current = null;
-    turnBufferRef.current = [];
-    turnRecorderMimeTypeRef.current = undefined;
-  }, [stopPlayback]);
+    if (client) {
+      try {
+        await client.leave();
+      } catch {
+        // Ignore RTC leave errors during cleanup.
+      }
+    }
+  }, []);
 
-  const speakAssistantResponse = useCallback(
-    async (content: string) => {
-      const text = content.trim();
-      const activeSessionToken = sessionTokenRef.current;
+  const getAgoraModule = useCallback(async () => {
+    if (!agoraModuleRef.current) {
+      agoraModuleRef.current = await import("agora-rtc-sdk-ng");
+    }
 
-      if (!text || activeSessionToken === 0) {
+    return agoraModuleRef.current;
+  }, []);
+
+  const pollSession = useCallback(
+    async (activeSessionId: string) => {
+      try {
+        const response = await fetch(
+          `/api/voice/session?sessionId=${encodeURIComponent(activeSessionId)}&cursor=${cursorRef.current}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        const payload = (await response.json()) as VoiceSessionPollResponse | { error?: string };
+
+        if (!response.ok) {
+          throw new Error(readErrorMessage(payload, "Voice session polling failed."));
+        }
+
+        if (destroyedRef.current || sessionIdRef.current !== activeSessionId) {
+          return;
+        }
+
+        const pollPayload = payload as VoiceSessionPollResponse;
+        cursorRef.current = pollPayload.cursor;
+        setPartialTranscript(pollPayload.partialTranscript);
+
+        if (pollPayload.status !== "disconnecting") {
+          setStatus(pollPayload.status);
+        }
+
+        const nextMessages: ChatMessage[] = [];
+        for (const event of pollPayload.events) {
+          if (event.type === "message") {
+            nextMessages.push(event.message);
+            continue;
+          }
+
+          onActions?.(event.actions);
+        }
+
+        if (nextMessages.length > 0) {
+          onMessages?.(nextMessages);
+        }
+      } catch (err) {
+        if (!destroyedRef.current && sessionIdRef.current === activeSessionId) {
+          setError(err instanceof Error ? err.message : "Voice session polling failed.");
+          setStatus("error");
+        }
+      } finally {
+        if (!destroyedRef.current && sessionIdRef.current === activeSessionId) {
+          pollTimeoutRef.current = window.setTimeout(() => {
+            void pollSession(activeSessionId);
+          }, pollIntervalRef.current);
+        }
+      }
+    },
+    [onActions, onMessages],
+  );
+
+  const refreshAvailability = useCallback(async () => {
+    try {
+      const response = await fetch("/api/voice/session", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as VoiceSessionResponse | { error?: string };
+
+      if (!response.ok) {
+        throw new Error(readErrorMessage(payload, "Voice availability check failed."));
+      }
+
+      const availability = payload as VoiceSessionResponse;
+      pollIntervalRef.current = availability.pollIntervalMs ?? 1200;
+
+      if (!availability.enabled) {
+        setStatus("disabled");
+        setError(availability.error ?? null);
         return;
       }
 
-      stopPlayback();
       setError(null);
-      setStatus("speaking");
+      setStatus((current) => (current === "disabled" ? "idle" : current));
+    } catch (err) {
+      setStatus("disabled");
+      setError(err instanceof Error ? err.message : "Voice availability check failed.");
+    }
+  }, []);
 
-      try {
-        const response = await fetch("/api/voice/speak", {
+  const disconnectVoice = useCallback(async () => {
+    stopPolling();
+    const activeSessionId = sessionIdRef.current;
+    sessionIdRef.current = null;
+    setSessionId(null);
+    setPartialTranscript(null);
+
+    if (status !== "disabled") {
+      setStatus("disconnecting");
+    }
+
+    try {
+      if (activeSessionId) {
+        await fetch("/api/voice/agent/remove", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ sessionId: activeSessionId }),
         });
-
-        if (sessionTokenRef.current !== activeSessionToken) {
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(await readErrorMessage(response));
-        }
-
-        const audioBlob = await response.blob();
-        if (sessionTokenRef.current !== activeSessionToken) {
-          return;
-        }
-
-        const playbackUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(playbackUrl);
-        playbackAudioRef.current = audio;
-        playbackUrlRef.current = playbackUrl;
-
-        audio.onended = () => {
-          if (playbackAudioRef.current === audio) {
-            playbackAudioRef.current = null;
-          }
-          if (playbackUrlRef.current === playbackUrl) {
-            playbackUrlRef.current = null;
-            URL.revokeObjectURL(playbackUrl);
-          }
-          if (sessionTokenRef.current === activeSessionToken) {
-            setStatus("idle");
-          }
-        };
-
-        audio.onerror = () => {
-          if (playbackAudioRef.current === audio) {
-            playbackAudioRef.current = null;
-          }
-          if (playbackUrlRef.current === playbackUrl) {
-            playbackUrlRef.current = null;
-            URL.revokeObjectURL(playbackUrl);
-          }
-          if (sessionTokenRef.current === activeSessionToken) {
-            setError("Assistant audio could not be played.");
-            setStatus("idle");
-          }
-        };
-
-        await audio.play();
-      } catch (err) {
-        if (sessionTokenRef.current !== activeSessionToken) {
-          return;
-        }
-
-        setError(err instanceof Error ? err.message : "Assistant audio could not be played.");
-        setStatus("idle");
-        stopPlayback();
       }
-    },
-    [stopPlayback],
-  );
-
-  const processRecordedTurn = useCallback(
-    async ({ blob, token }: RecordedTurn) => {
-      if (sessionTokenRef.current !== token || token === 0) {
-        return;
+    } catch {
+      // Local teardown still needs to proceed.
+    } finally {
+      cursorRef.current = 0;
+      await teardownRtc();
+      if (!destroyedRef.current) {
+        setStatus((current) => (current === "disabled" ? "disabled" : "idle"));
+        setError(null);
       }
+    }
+  }, [status, stopPolling, teardownRtc]);
 
-      if (blob.size === 0) {
-        setStatus("idle");
-        return;
-      }
-
-      setError(null);
-      setStatus("transcribing");
-
-      try {
-        const formData = new FormData();
-        formData.append("file", blob, "voice-turn.webm");
-        formData.append("language", "en");
-
-        const transcriptionResponse = await fetch("/api/voice/transcribe", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (sessionTokenRef.current !== token) {
-          return;
-        }
-
-        if (!transcriptionResponse.ok) {
-          throw new Error(await readErrorMessage(transcriptionResponse));
-        }
-
-        const payload = (await transcriptionResponse.json()) as VoiceTranscribeResponse;
-        const transcript = payload.text.trim();
-
-        if (!transcript) {
-          setStatus("idle");
-          return;
-        }
-
-        const response = await onSpokenTurn(transcript);
-
-        if (sessionTokenRef.current !== token) {
-          return;
-        }
-
-        if (response.content.trim()) {
-          await speakAssistantResponse(response.content);
-          return;
-        }
-
-        setStatus("idle");
-      } catch (err) {
-        if (sessionTokenRef.current !== token) {
-          return;
-        }
-
-        setError(err instanceof Error ? err.message : "Speech turn failed.");
-        setStatus("idle");
-      }
-    },
-    [onSpokenTurn, speakAssistantResponse],
-  );
-
-  const toggleRecording = useCallback(async () => {
-    const recorder = recordingRef.current;
-
-    if (status === "recording" && recorder && recorder.state !== "inactive") {
-      setStatus("transcribing");
-      try {
-        recorder.stop();
-      } catch {
-        setStatus("idle");
-      }
+  const connectVoice = useCallback(async () => {
+    if (status === "disabled" || status === "connecting" || status === "disconnecting") {
       return;
     }
 
-    if (status === "transcribing" || status === "speaking") {
-      return;
-    }
+    setError(null);
+    setPartialTranscript(null);
+    setStatus("connecting");
 
-    if (typeof MediaRecorder === "undefined") {
-      setError("Your browser does not support voice recording.");
-      setStatus("error");
-      return;
-    }
+    let nextSessionId: string | null = null;
 
     try {
-      let stream = mediaStreamRef.current;
-      if (!stream) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
+      const module = await getAgoraModule();
+      const sessionResponse = await fetch("/api/voice/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inventionId,
+          componentId: componentId ?? null,
+        }),
+      });
+      const sessionPayload = (await sessionResponse.json()) as VoiceSessionResponse | { error?: string };
+
+      if (!sessionResponse.ok) {
+        throw new Error(readErrorMessage(sessionPayload, "Voice session start failed."));
       }
 
-      const audioTrack = stream.getAudioTracks()[0];
-      if (!audioTrack) {
-        throw new Error("Microphone access is required for voice mode.");
+      const sessionData = sessionPayload as VoiceSessionResponse;
+      if (!sessionData.enabled || !sessionData.sessionId || !sessionData.appId || !sessionData.channelName) {
+        setStatus("disabled");
+        setError(sessionData.error ?? "Live voice is not configured.");
+        return;
       }
 
-      const mimeType = pickRecorderMimeType();
-      turnBufferRef.current = [];
-      turnRecorderMimeTypeRef.current = mimeType;
+      nextSessionId = sessionData.sessionId;
+      sessionIdRef.current = nextSessionId;
+      setSessionId(nextSessionId);
+      cursorRef.current = sessionData.cursor ?? 0;
+      pollIntervalRef.current = sessionData.pollIntervalMs ?? pollIntervalRef.current;
 
-      const nextRecorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      const client = module.default.createClient({
+        mode: "rtc",
+        codec: "vp8",
+      });
+      clientRef.current = client;
 
-      const activeSessionToken = ++sessionCounterRef.current;
-      sessionTokenRef.current = activeSessionToken;
-
-      nextRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          turnBufferRef.current.push(event.data);
-        }
-      };
-
-      nextRecorder.onerror = () => {
-        if (sessionTokenRef.current !== activeSessionToken) {
+      client.on("user-published", async (user, mediaType) => {
+        if (mediaType !== "audio") {
           return;
         }
 
-        setError("Could not record microphone audio.");
-        setStatus("idle");
-        recordingRef.current = null;
-      };
+        await client.subscribe(user, "audio");
+        user.audioTrack?.play();
+      });
 
-      nextRecorder.onstop = () => {
-        recordingRef.current = null;
-        const turnBlob = new Blob(turnBufferRef.current, {
-          type: turnRecorderMimeTypeRef.current ?? "audio/webm",
-        });
-        turnBufferRef.current = [];
-        turnRecorderMimeTypeRef.current = undefined;
-        void processRecordedTurn({ blob: turnBlob, token: activeSessionToken });
-      };
+      client.on("stream-message", (_uid, payload) => {
+        const event = parseRtcVoiceEvent(payload);
+        if (!event) {
+          return;
+        }
 
-      recordingRef.current = nextRecorder;
-      setError(null);
-      setStatus("recording");
-      nextRecorder.start();
+        if (event.partialTranscript !== undefined) {
+          setPartialTranscript(event.partialTranscript);
+        }
+
+        if (event.status) {
+          setStatus(event.status);
+        }
+      });
+
+      const localTrack = await module.default.createMicrophoneAudioTrack();
+      localAudioTrackRef.current = localTrack;
+
+      await client.join(
+        sessionData.appId,
+        sessionData.channelName,
+        sessionData.rtcToken ?? null,
+        sessionData.rtcUid ?? null,
+      );
+      await client.publish([localTrack]);
+
+      const inviteResponse = await fetch("/api/voice/agent/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: nextSessionId,
+        }),
+      });
+      const invitePayload = (await inviteResponse.json()) as { error?: string };
+      if (!inviteResponse.ok) {
+        throw new Error(readErrorMessage(invitePayload, "Voice agent invite failed."));
+      }
+
+      setStatus("listening");
+      void pollSession(nextSessionId);
     } catch (err) {
-      cleanupMedia();
-      setStatus("error");
-      setError(err instanceof Error ? err.message : "Voice recording failed to start.");
-    }
-  }, [cleanupMedia, processRecordedTurn, status]);
+      if (nextSessionId) {
+        sessionIdRef.current = nextSessionId;
+        setSessionId(nextSessionId);
+        await disconnectVoice();
+      } else {
+        await teardownRtc();
+      }
 
-  const stopVoice = useCallback(() => {
-    sessionTokenRef.current = 0;
-    cleanupMedia();
-    setStatus("idle");
-    setError(null);
-  }, [cleanupMedia]);
+      if (!destroyedRef.current) {
+        setStatus("error");
+        setError(err instanceof Error ? err.message : "Live voice connection failed.");
+      }
+    }
+  }, [
+    componentId,
+    disconnectVoice,
+    getAgoraModule,
+    inventionId,
+    pollSession,
+    status,
+    teardownRtc,
+  ]);
+
+  const toggleConnection = useCallback(async () => {
+    if (sessionIdRef.current) {
+      await disconnectVoice();
+      return;
+    }
+
+    await connectVoice();
+  }, [connectVoice, disconnectVoice]);
+
+  useEffect(() => {
+    void refreshAvailability();
+  }, [refreshAvailability]);
+
+  useEffect(() => {
+    if (!sessionIdRef.current) {
+      return;
+    }
+
+    void fetch("/api/voice/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sessionId: sessionIdRef.current,
+        inventionId,
+        componentId: componentId ?? null,
+      }),
+    });
+  }, [componentId, inventionId]);
 
   useEffect(() => {
     return () => {
-      stopVoice();
+      destroyedRef.current = true;
+      stopPolling();
+      void disconnectVoice();
     };
-  }, [stopVoice]);
+  }, [disconnectVoice, stopPolling]);
 
   return {
     error,
-    isRecording: status === "recording",
-    isSpeaking: status === "speaking",
-    speakAssistantResponse,
+    isConnected: Boolean(sessionId),
+    partialTranscript,
+    sessionId,
     status,
-    stopVoice,
-    toggleRecording,
+    toggleConnection,
+    disconnectVoice,
   };
 }

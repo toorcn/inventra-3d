@@ -51,6 +51,7 @@ export default function InventionDetailPage() {
     () => new Set(getComponentsByInventionId(invention.id).map((comp) => comp.id)),
     [invention.id],
   );
+  const [voiceSessionId, setVoiceSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -160,34 +161,35 @@ export default function InventionDetailPage() {
     [componentIdSet, handleComponentSelect, invention.hasModel],
   );
 
-  const { messages, isLoading, isSpeaking, sendMessage, suggestedQuestions } = useExpert({
+  const {
+    appendServerMessages,
+    messages,
+    isLoading,
+    isSpeaking,
+    sendMessage,
+    suggestedQuestions,
+  } = useExpert({
     inventionId: invention.id,
     componentId: selectedComponentId,
+    activeVoiceSessionId: voiceSessionId,
     onActions: handleExpertActions,
   });
 
-  const handleSpokenTurn = useCallback(
-    (content: string) => sendMessage(content, { delivery: "spoken" }),
-    [sendMessage],
-  );
-
   const voice = useVoiceSession({
-    onSpokenTurn: handleSpokenTurn,
+    inventionId: invention.id,
+    componentId: selectedComponentId,
+    onMessages: appendServerMessages,
+    onActions: handleExpertActions,
   });
 
-  const isVoiceBusy = voice.status === "recording" || voice.status === "transcribing" || voice.status === "speaking";
+  useEffect(() => {
+    setVoiceSessionId(voice.sessionId);
+  }, [voice.sessionId]);
 
   const handleConversationTurn = useCallback(
-    async (content: string, options?: { delivery?: TranscriptDelivery }) => {
-      const response = await sendMessage(content, options);
-
-      if (isVoiceBusy && response.content.trim()) {
-        await voice.speakAssistantResponse(response.content);
-      }
-
-      return response;
-    },
-    [isVoiceBusy, sendMessage, voice.speakAssistantResponse],
+    async (content: string, options?: { delivery?: TranscriptDelivery }) =>
+      sendMessage(content, options),
+    [sendMessage],
   );
 
   return (
@@ -303,8 +305,9 @@ export default function InventionDetailPage() {
             suggestedQuestions={suggestedQuestions}
             voiceStatus={voice.status}
             voiceError={voice.error}
+            voicePartialTranscript={voice.partialTranscript}
             onSendMessage={handleConversationTurn}
-            onToggleRecording={voice.toggleRecording}
+            onToggleVoiceConnection={voice.toggleConnection}
           />
         </aside>
       </section>

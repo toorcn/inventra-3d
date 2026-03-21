@@ -81,20 +81,16 @@ export interface ChatMessage {
 export interface ChatRequest {
   messages: ChatMessage[];
   inventionId: string;
-  componentId?: string;
+  componentId?: string | null;
+  sessionId?: string;
+  clientMessageId?: string;
 }
 
 export interface ChatResponse {
   content: string;
   actions: ExpertAction[];
-}
-
-export interface VoiceTranscribeResponse {
-  text: string;
-}
-
-export interface VoiceSpeakRequest {
-  text: string;
+  assistantMessageId?: string;
+  sessionId?: string;
 }
 
 export type ExpertAction =
@@ -121,6 +117,89 @@ export type ExpertAction =
       color?: string;
       thickness?: number;
     };
+
+export type VoiceSessionStatus =
+  | "disabled"
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "listening"
+  | "thinking"
+  | "speaking"
+  | "disconnecting"
+  | "error";
+
+export type VoiceSessionEvent =
+  | {
+      cursor: number;
+      type: "message";
+      message: ChatMessage;
+    }
+  | {
+      cursor: number;
+      type: "actions";
+      actions: ExpertAction[];
+    };
+
+export interface VoiceSessionResponse {
+  enabled: boolean;
+  sessionId?: string;
+  appId?: string;
+  channelName?: string;
+  rtcUid?: number;
+  rtcToken?: string | null;
+  status: VoiceSessionStatus;
+  partialTranscript?: string | null;
+  cursor?: number;
+  pollIntervalMs?: number;
+  error?: string;
+}
+
+export interface VoiceSessionPollResponse {
+  enabled: boolean;
+  sessionId: string;
+  status: VoiceSessionStatus;
+  partialTranscript: string | null;
+  cursor: number;
+  events: VoiceSessionEvent[];
+}
+
+export interface VoiceAgentInviteRequest {
+  sessionId: string;
+}
+
+export interface VoiceAgentRemoveRequest {
+  sessionId: string;
+}
+
+export interface VoiceAgentInviteResponse {
+  ok: boolean;
+  agentId?: string;
+}
+
+export interface VoiceAgentWebhookRequest {
+  model?: string;
+  stream?: boolean;
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+}
+
+export interface VoiceAgentWebhookResponse {
+  id: string;
+  object: "chat.completion";
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    finish_reason: "stop";
+    message: {
+      role: "assistant";
+      content: string;
+    };
+  }>;
+}
 
 export interface GlobeMarker {
   id: string;

@@ -15,8 +15,9 @@ interface ChatPanelProps {
   suggestedQuestions: string[];
   voiceStatus: VoiceStatus;
   voiceError: string | null;
+  voicePartialTranscript: string | null;
   onSendMessage: (content: string, options?: { delivery?: TranscriptDelivery }) => Promise<ChatResponse>;
-  onToggleRecording: () => void;
+  onToggleVoiceConnection: () => void;
 }
 
 export function ChatPanel({
@@ -26,15 +27,20 @@ export function ChatPanel({
   suggestedQuestions,
   voiceStatus,
   voiceError,
+  voicePartialTranscript,
   onSendMessage,
-  onToggleRecording,
+  onToggleVoiceConnection,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isVoiceRecording = voiceStatus === "recording";
-  const isVoiceTranscribing = voiceStatus === "transcribing";
+  const isVoiceConnecting = voiceStatus === "connecting";
+  const isVoiceDisconnecting = voiceStatus === "disconnecting";
+  const isVoiceThinking = voiceStatus === "thinking";
   const isVoiceSpeaking = voiceStatus === "speaking";
-  const isVoiceBusy = isVoiceRecording || isVoiceTranscribing || isVoiceSpeaking;
+  const isVoiceListening = voiceStatus === "listening" || voiceStatus === "connected";
+  const isVoiceConnected = isVoiceListening || isVoiceThinking || isVoiceSpeaking;
+  const isVoiceDisabled = voiceStatus === "disabled";
+  const shouldDisableInput = isLoading || isVoiceConnecting || isVoiceDisconnecting;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -42,7 +48,7 @@ export function ChatPanel({
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text || isLoading || isVoiceBusy) return;
+    if (!text || shouldDisableInput) return;
     setInput("");
     void onSendMessage(text, { delivery: "typed" });
   };
@@ -50,40 +56,48 @@ export function ChatPanel({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
-        <ExpertAvatar isSpeaking={isSpeaking || isVoiceRecording || isVoiceTranscribing || isVoiceSpeaking} />
+        <ExpertAvatar isSpeaking={isSpeaking || isVoiceThinking || isVoiceSpeaking} />
         <div>
           <h3 className="text-sm font-semibold text-white">AI Expert</h3>
           <p className="text-xs text-[var(--text-secondary)]">
-            {isVoiceRecording
-              ? "Recording one spoken turn..."
-              : isVoiceTranscribing
-                ? "Transcribing and answering..."
-                : isVoiceSpeaking
-                  ? "Playing the answer..."
-                  : isSpeaking
-                    ? "Thinking..."
-                    : "Tap Speak to ask by voice, or type below."}
+            {isVoiceDisabled
+              ? "Live voice is unavailable. Typed chat still works."
+              : isVoiceConnecting
+                ? "Connecting live voice..."
+                : isVoiceDisconnecting
+                  ? "Disconnecting live voice..."
+                  : isVoiceSpeaking
+                    ? "Speaking through Agora..."
+                    : isVoiceThinking
+                      ? "Thinking through the answer..."
+                      : isVoiceListening
+                        ? "Live voice is connected and listening."
+                        : isSpeaking
+                          ? "Thinking..."
+                          : "Connect live voice or type below."}
           </p>
         </div>
         <div className="ml-auto">
           <button
             type="button"
-            onClick={onToggleRecording}
-            disabled={isLoading || isVoiceTranscribing || isVoiceSpeaking}
+            onClick={onToggleVoiceConnection}
+            disabled={isVoiceDisabled || isVoiceConnecting || isVoiceDisconnecting}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
           >
-            {isVoiceTranscribing || isVoiceSpeaking ? (
+            {isVoiceConnecting || isVoiceDisconnecting ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
               <Mic className="size-4" />
             )}
-            {isVoiceRecording
-              ? "Stop turn"
-              : isVoiceTranscribing
-                ? "Transcribing..."
-                : isVoiceSpeaking
-                  ? "Playing..."
-                  : "Speak"}
+            {isVoiceConnecting
+              ? "Connecting..."
+              : isVoiceDisconnecting
+                ? "Disconnecting..."
+                : isVoiceConnected
+                  ? "Disconnect"
+                  : isVoiceDisabled
+                    ? "Unavailable"
+                    : "Connect Voice"}
           </button>
         </div>
       </div>
@@ -95,9 +109,11 @@ export function ChatPanel({
               Voice mode issue: {voiceError}
             </div>
           )}
-          {isVoiceRecording || isVoiceTranscribing || isVoiceSpeaking ? (
+          {isVoiceConnected ? (
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-xs text-cyan-100">
-              Voice input is active. Spoken turns and typed follow-ups share the same transcript.
+              {voicePartialTranscript?.trim()
+                ? `Live transcript: ${voicePartialTranscript}`
+                : "Live voice is active. Spoken turns and typed follow-ups share the same transcript."}
             </div>
           ) : null}
           {messages.map((msg) => (
@@ -123,7 +139,7 @@ export function ChatPanel({
 
       <SuggestedQuestions
         questions={suggestedQuestions}
-        disabled={isLoading || isVoiceBusy}
+        disabled={shouldDisableInput}
         onSelect={(q) => {
           setInput("");
           void onSendMessage(q, { delivery: "typed" });
@@ -137,12 +153,12 @@ export function ChatPanel({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Type a question..."
-            disabled={isLoading || isVoiceBusy}
+            disabled={shouldDisableInput}
             className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[var(--text-secondary)]"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading || isVoiceBusy}
+            disabled={!input.trim() || shouldDisableInput}
             className="rounded-full p-1.5 text-blue-400 transition-colors hover:bg-blue-500/20 disabled:opacity-40"
           >
             <Send className="size-4" />

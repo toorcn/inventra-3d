@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { getVoiceConfig } from "@/lib/voice";
 
 const trackedKeys = [
-  "OPENAI_API_KEY",
+  "NEXT_PUBLIC_AGORA_APP_ID",
+  "AGORA_CUSTOMER_ID",
+  "AGORA_CUSTOMER_SECRET",
   "ELEVENLABS_API_KEY",
   "ELEVENLABS_VOICE_ID",
-  "OPENAI_WHISPER_MODEL",
   "ELEVENLABS_MODEL_ID",
+  "NEXT_PUBLIC_APP_URL",
 ] as const;
 
 const originalValues = Object.fromEntries(
@@ -35,19 +37,23 @@ describe("getVoiceConfig", () => {
     );
   });
 
-  it("uses defaults when optional model overrides are omitted", () => {
-    process.env.OPENAI_API_KEY = "test-openai";
+  it("uses defaults when optional overrides are omitted", () => {
+    process.env.NEXT_PUBLIC_AGORA_APP_ID = "test-app-id";
+    process.env.AGORA_CUSTOMER_ID = "test-customer";
+    process.env.AGORA_CUSTOMER_SECRET = "test-secret";
     process.env.ELEVENLABS_API_KEY = "test-elevenlabs";
     process.env.ELEVENLABS_VOICE_ID = "test-voice";
-    delete process.env.OPENAI_WHISPER_MODEL;
     delete process.env.ELEVENLABS_MODEL_ID;
+    delete process.env.NEXT_PUBLIC_APP_URL;
 
     const config = getVoiceConfig();
 
-    expect(config.openAIApiKey).toBe("test-openai");
+    expect(config.appId).toBe("test-app-id");
+    expect(config.customerId).toBe("test-customer");
+    expect(config.customerSecret).toBe("test-secret");
     expect(config.elevenLabsApiKey).toBe("test-elevenlabs");
     expect(config.elevenLabsVoiceId).toBe("test-voice");
-    expect(config.whisperModel).toBe("whisper-1");
     expect(config.elevenLabsModelId).toBe("eleven_multilingual_v2");
+    expect(config.appUrl).toBe("http://localhost:3000");
   });
 });
