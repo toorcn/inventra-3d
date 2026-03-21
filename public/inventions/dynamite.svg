@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#141e38"/>
+      <stop offset="100%" stop-color="#0a0b14"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="40%">
+      <stop offset="0%" stop-color="#d4af55" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#d4af55" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stick1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8b1a1a"/>
+      <stop offset="40%" stop-color="#c0392b"/>
+      <stop offset="100%" stop-color="#8b1a1a"/>
+    </linearGradient>
+    <linearGradient id="stick2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7a1515"/>
+      <stop offset="40%" stop-color="#a93226"/>
+      <stop offset="100%" stop-color="#7a1515"/>
+    </linearGradient>
+    <linearGradient id="fuseGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#d4af55"/>
+      <stop offset="60%" stop-color="#8b7340"/>
+      <stop offset="100%" stop-color="#555"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <ellipse cx="200" cy="165" rx="130" ry="100" fill="url(#glow)"/>
+
+  <!-- Bundle rope/wrapper bands -->
+  <!-- Back sticks (partial visibility) -->
+  <rect x="130" y="115" width="34" height="105" rx="17" fill="#6b1010" opacity="0.6"/>
+  <rect x="236" y="115" width="34" height="105" rx="17" fill="#6b1010" opacity="0.6"/>
+
+  <!-- 5 main dynamite sticks arranged in a bundle (3 front, 2 behind) -->
+  <!-- Stick 1 - far left -->
+  <rect x="128" y="112" width="34" height="108" rx="17" fill="url(#stick2)" opacity="0.85"/>
+  <rect x="128" y="112" width="34" height="15" rx="8" fill="#5a1010" opacity="0.85"/>
+  <rect x="128" y="205" width="34" height="15" rx="8" fill="#5a1010" opacity="0.85"/>
+
+  <!-- Stick 2 - left center -->
+  <rect x="158" y="108" width="34" height="108" rx="17" fill="url(#stick1)" opacity="0.9"/>
+  <rect x="158" y="108" width="34" height="15" rx="8" fill="#6b1212" opacity="0.9"/>
+  <rect x="158" y="201" width="34" height="15" rx="8" fill="#6b1212" opacity="0.9"/>
+
+  <!-- Stick 3 - center -->
+  <rect x="183" y="105" width="34" height="110" rx="17" fill="url(#stick1)"/>
+  <rect x="183" y="105" width="34" height="15" rx="8" fill="#6b1212"/>
+  <rect x="183" y="200" width="34" height="15" rx="8" fill="#6b1212"/>
+
+  <!-- Stick 4 - right center -->
+  <rect x="208" y="108" width="34" height="108" rx="17" fill="url(#stick1)" opacity="0.9"/>
+  <rect x="208" y="108" width="34" height="15" rx="8" fill="#6b1212" opacity="0.9"/>
+  <rect x="208" y="201" width="34" height="15" rx="8" fill="#6b1212" opacity="0.9"/>
+
+  <!-- Stick 5 - far right -->
+  <rect x="238" y="112" width="34" height="105" rx="17" fill="url(#stick2)" opacity="0.85"/>
+  <rect x="238" y="112" width="34" height="15" rx="8" fill="#5a1010" opacity="0.85"/>
+  <rect x="238" y="202" width="34" height="15" rx="8" fill="#5a1010" opacity="0.85"/>
+
+  <!-- Binding rope - top band -->
+  <rect x="125" y="138" width="150" height="8" rx="4" fill="rgba(212,175,85,0.6)" stroke="#d4af55" stroke-width="1"/>
+  <!-- Binding rope - middle band -->
+  <rect x="125" y="158" width="150" height="8" rx="4" fill="rgba(212,175,85,0.6)" stroke="#d4af55" stroke-width="1"/>
+  <!-- Binding rope - lower band -->
+  <rect x="125" y="178" width="150" height="8" rx="4" fill="rgba(212,175,85,0.6)" stroke="#d4af55" stroke-width="1"/>
+
+  <!-- Fuse emerging from center-top -->
+  <path d="M 200 105 C 205 90, 195 75, 210 55 C 220 40, 215 25, 220 15"
+        fill="none" stroke="url(#fuseGrad)" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Fuse twist texture -->
+  <path d="M 200 105 C 205 90, 195 75, 210 55 C 220 40, 215 25, 220 15"
+        fill="none" stroke="#d4af55" stroke-width="1" stroke-opacity="0.4" stroke-dasharray="3,4"/>
+
+  <!-- Spark at fuse tip -->
+  <circle cx="220" cy="15" r="3" fill="#d4af55" opacity="0.9"/>
+  <line x1="220" y1="12" x2="218" y2="6" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.8"/>
+  <line x1="220" y1="12" x2="226" y2="8" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.8"/>
+  <line x1="220" y1="12" x2="224" y2="6" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.7"/>
+
+  <!-- Nobel label on center stick -->
+  <text x="200" y="160" text-anchor="middle" font-family="serif" font-size="9" fill="#f5f0e1" opacity="0.7" transform="rotate(0,200,160)">DYNAMITE</text>
+
+  <!-- Bottom label -->
+  <text x="200" y="278" text-anchor="middle" font-family="monospace" font-size="12" fill="#d4af55" opacity="0.85" letter-spacing="2">NOBEL  1867</text>
+  <line x1="100" y1="268" x2="300" y2="268" stroke="rgba(212,175,85,0.3)" stroke-width="1"/>
+</svg>

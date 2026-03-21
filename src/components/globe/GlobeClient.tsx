@@ -20,10 +20,11 @@ interface GlobeClientProps {
   categories: Category[];
   activeCategories: CategoryId[];
   selectedInventionId: string | null;
-  onCountryClick: (countryCode: string) => void;
+  onCountryClick: (countryCode: string, countryName: string) => void;
   onInventionClick: (inventionId: string) => void;
   onCountryHover: (data: CountryHoverData | null) => void;
   globeRef?: React.MutableRefObject<GlobeMethods | undefined>;
+  hoveredCountry?: CountryHoverData | null;
 }
 
 const GEOJSON_URL =
@@ -125,6 +126,7 @@ export default function GlobeClient({
   onInventionClick,
   onCountryHover,
   globeRef,
+  hoveredCountry,
 }: GlobeClientProps) {
   const { width, height } = useWindowSize();
   const localRef = useRef<GlobeMethods | undefined>(undefined);
@@ -206,6 +208,20 @@ export default function GlobeClient({
     return [{ id: inv.id, lat: inv.location.lat, lng: inv.location.lng, name: inv.title }];
   }, [filtered, selectedInventionId]);
 
+  // Premium hover label for the country
+  const hoverLabels = useMemo(() => {
+    if (!hoveredCountry) return [];
+    const centroid = COUNTRY_CENTROIDS[hoveredCountry.countryCode];
+    if (!centroid) return [];
+    return [{
+      name: hoveredCountry.country,
+      lat: centroid.lat,
+      lng: centroid.lng,
+    }];
+  }, [hoveredCountry]);
+
+  const allLabels = useMemo(() => [...selectedMarker, ...hoverLabels], [selectedMarker, hoverLabels]);
+
   return (
     <div className="h-full w-full overflow-hidden">
       <Globe
@@ -226,8 +242,10 @@ export default function GlobeClient({
         }
         polygonsTransitionDuration={0}
         onPolygonClick={(feature: object) => {
-          const code = (feature as GeoFeature).properties.ISO_A2;
-          if (code) onCountryClick(code);
+          const f = feature as GeoFeature;
+          const code = f.properties.ISO_A2;
+          const name = f.properties.ADMIN || f.properties.NAME || "";
+          if (code) onCountryClick(code, name);
         }}
         polygonLabel={(feature: object) => {
           const f = feature as GeoFeature;
@@ -258,17 +276,37 @@ export default function GlobeClient({
         }
         htmlAltitude={0.05}
         htmlTransitionDuration={300}
-        // Selected invention highlight label
-        labelsData={selectedMarker}
+        // Labels (Both selected marker and hover premium label)
+        labelsData={allLabels}
         labelLat={(m: object) => (m as { lat: number }).lat}
         labelLng={(m: object) => (m as { lng: number }).lng}
         labelText={(m: object) => (m as { name: string }).name}
-        labelSize={0.4}
-        labelDotRadius={0.4}
-        labelColor={() => "#d4af55"}
+        labelSize={(m: object) => {
+          // If it's a hovering country label, make it larger and more "premium"
+          const hLabels = hoverLabels as {name: string}[];
+          const isHoverLabel = hLabels.some(h => h.name === (m as {name: string}).name);
+          return isHoverLabel ? 1.4 : 0.4;
+        }}
+        labelDotRadius={(m: object) => {
+          const hLabels = hoverLabels as {name: string}[];
+          const isHoverLabel = hLabels.some(h => h.name === (m as {name: string}).name);
+          return isHoverLabel ? 0 : 0.4; // Hide dot for hover label
+        }}
+        labelColor={(m: object) => {
+          const hLabels = hoverLabels as {name: string}[];
+          const isHoverLabel = hLabels.some(h => h.name === (m as {name: string}).name);
+          return isHoverLabel ? "#f5f0e1" : "#d4af55";
+        }}
         labelResolution={2}
-        labelAltitude={0.08}
-        onLabelClick={(m: object) => onInventionClick((m as { id: string }).id)}
+        labelAltitude={(m: object) => {
+          const hLabels = hoverLabels as {name: string}[];
+          const isHoverLabel = hLabels.some(h => h.name === (m as {name: string}).name);
+          return isHoverLabel ? 0.12 : 0.08;
+        }}
+        onLabelClick={(m: object) => {
+          const id = (m as { id?: string }).id;
+          if (id) onInventionClick(id);
+        }}
       />
     </div>
   );

@@ -22,6 +22,7 @@ const INVENTION_IMAGES: Record<string, string> = {
   "penicillin": "/inventions/penicillin.png",
   "dna-structure": "/inventions/dna-structure.png",
   "solar-cell": "/inventions/solar-cell.png",
+  "macintosh": "/inventions/macintosh.png",
   "crispr": "/inventions/crispr.png",
   "transistor": "/inventions/transistor.png",
   "world-wide-web": "/inventions/world-wide-web.png",
@@ -51,11 +52,12 @@ export function InventionDetail({ invention, onBack }: InventionDetailProps) {
       <div className="border-b border-[var(--border-gold)] bg-white/[0.02] p-4">
         <button
           onClick={onBack}
-          className="group mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-gold-light)]"
+          className="group mb-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--accent-gold-light)] transition-all hover:bg-white/10 hover:text-white"
         >
-          <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
-          Back to list
+          <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-1" />
+          Return to Universe
         </button>
+
 
         <div>
           <Badge category={invention.category} className="mb-3" />

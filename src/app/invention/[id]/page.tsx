@@ -249,8 +249,20 @@ export default function InventionDetailPage() {
   );
 
   return (
-    <main className="flex h-screen flex-col bg-[#05060b]">
-      <header className="flex items-center justify-between border-b border-white/5 bg-black/40 px-6 py-4 backdrop-blur-xl">
+    <main className="flex h-screen flex-col bg-[#0c0d11] relative overflow-hidden">
+      {/* Background Texture Overlay - Fine Technical Paper */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.05]" 
+           style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/brushed-alum.png")' }} />
+      
+      {/* Drafting Grid Overlay */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.03]"
+           style={{ 
+             backgroundImage: 'linear-gradient(rgba(212, 175, 85, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(212, 175, 85, 0.1) 1px, transparent 1px)',
+             backgroundSize: '40px 40px'
+           }} />
+      
+      <header className="relative z-20 flex items-center justify-between border-b border-[var(--border-gold)]/20 bg-[var(--bg-panel)] px-6 py-4 backdrop-blur-xl shadow-lg">
+        <div className="absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-[var(--accent-gold)]/30 to-transparent" />
         <Link
           href="/"
           className="group inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[var(--accent-gold-light)] opacity-70 transition-all hover:opacity-100"
@@ -258,16 +270,24 @@ export default function InventionDetailPage() {
           <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
           Return to Universe
         </Link>
-        <div className="text-center">
-          <h1 className="text-lg font-bold tracking-tight text-white" style={{ fontFamily: "var(--font-playfair), serif" }}>
-            {invention.title} <span className="opacity-40 font-serif italic text-sm">c. {invention.year}</span>
+        <div className="flex-1 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--text-secondary)] opacity-50 mb-1">Invention Archive</p>
+          <h1 className="text-2xl font-bold tracking-[0.15em] text-white" style={{ fontFamily: "var(--font-playfair), serif" }}>
+            {invention.title.toUpperCase()} <span className="opacity-40 font-serif italic text-sm normal-case ml-2">c. {invention.year}</span>
           </h1>
         </div>
-        <Badge category={invention.category} />
+        <div className="flex-1 flex justify-end">
+          <Badge category={invention.category} className="px-4 py-1.5 shadow-[0_0_15px_rgba(255,255,255,0.05)]" />
+        </div>
       </header>
 
-      <section className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,_#111428_0%,_#05060b_100%)] lg:flex-[2]">
+      <section className="relative z-10 flex flex-1 flex-col overflow-hidden lg:flex-row">
+        {/* Environment - Inventor's Desk Lighting */}
+        <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_75%_20%,_#1a1b26_0%,_#0c0d11_100%)] lg:flex-[2]">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/clean-gray-paper.png')] opacity-[0.04] pointer-events-none" />
+          
+          {/* Desk Lamp Corner Glow */}
+          <div className="absolute -top-24 -right-24 size-[600px] bg-[var(--accent-gold)]/5 blur-[120px] rounded-full pointer-events-none" />
           {invention.hasModel ? (
             <>
               <ErrorBoundary>
@@ -283,18 +303,39 @@ export default function InventionDetailPage() {
                 />
               </ErrorBoundary>
 
-              {/* Overlay Info Panel for Model View */}
-              <div className="pointer-events-none absolute bottom-8 left-8 z-10 max-w-sm">
-                <div className="pointer-events-auto rounded-3xl border border-white/10 bg-black/40 p-6 shadow-2xl backdrop-blur-2xl transition-all hover:bg-black/50 ring-1 ring-white/5">
-                  <div className="mb-3 flex items-center gap-3">
-                    <Badge category={invention.category} />
-                    <span className="text-[10px] font-bold text-[var(--accent-gold)] uppercase tracking-[0.2em]">{invention.year} AD</span>
+              {/* Overlay Info Panel for Model View - The Archivist Style */}
+              <div className="pointer-events-none absolute bottom-12 left-8 z-10 max-w-sm">
+                <div 
+                  className="pointer-events-auto relative overflow-hidden bg-[var(--bg-panel)] p-8 shadow-2xl backdrop-blur-xl transition-all hover:bg-black/60 ring-1 ring-[var(--border-gold)]/20"
+                  style={{ 
+                    clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%)",
+                  }}
+                >
+                  <div className="absolute top-0 left-0 w-1 h-12 bg-[var(--accent-gold)]" />
+                  <div className="absolute bottom-0 right-0 w-12 h-1 bg-[var(--accent-gold)]" />
+                  
+                  <div className="mb-4 flex items-center gap-4">
+                    <div className="h-0.5 w-8 bg-[var(--accent-gold)]/40" />
+                    <span className="text-[11px] font-bold text-[var(--accent-gold)] uppercase tracking-[0.3em]">{invention.year} AD</span>
                   </div>
-                  <h2 className="mb-3 text-3xl font-bold tracking-tight text-white" style={{ fontFamily: "var(--font-playfair), serif" }}>{invention.title}</h2>
-                  <div className="line-clamp-3 text-sm leading-relaxed text-gray-300 transition-all hover:line-clamp-none">
-                    <ReactMarkdown components={{ p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p> }}>
+                  
+                  <h2 className="mb-4 text-4xl font-bold tracking-tight text-white leading-tight" style={{ fontFamily: "var(--font-playfair), serif" }}>
+                    {invention.title}
+                  </h2>
+                  
+                  <div className="line-clamp-4 text-[13px] leading-relaxed text-gray-300 antialiased" style={{ fontFamily: "var(--font-cormorant), serif" }}>
+                    <ReactMarkdown components={{ p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p> }}>
                       {invention.description}
                     </ReactMarkdown>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-between border-t border-[var(--border-gold)]/10 pt-4">
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Archival Entry: #{invention.id.slice(0, 6).toUpperCase()}</p>
+                    <div className="flex gap-1">
+                      <div className="size-1 rounded-full bg-[var(--accent-gold)]/50" />
+                      <div className="size-1 rounded-full bg-[var(--accent-gold)]/30" />
+                      <div className="size-1 rounded-full bg-[var(--accent-gold)]/10" />
+                    </div>
                   </div>
                 </div>
               </div>

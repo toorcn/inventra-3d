@@ -23,6 +23,8 @@ export default function Home() {
   const [demoRunning, setDemoRunning] = useState(false);
   const [hoveredCountry, setHoveredCountry] = useState<CountryHoverData | null>(null);
   const [pinnedCountry, setPinnedCountry] = useState<CountryHoverData | null>(null);
+  const [isRandomDiscoveryOpen, setIsRandomDiscoveryOpen] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const handleViewOnGlobe = useCallback(
     (invention: Invention) => {
@@ -32,24 +34,31 @@ export default function Home() {
   );
 
   const handleCountryHover = useCallback((data: CountryHoverData | null) => {
-    // Only show hover if nothing is pinned
-    setHoveredCountry(data);
+    // Only update if we have new data (persistence)
+    if (data) {
+      setHasInteracted(true);
+      setHoveredCountry(data);
+    }
   }, []);
 
-  const handleCountryClick = useCallback((code: string) => {
+  const handleCountryClick = useCallback((code: string, name: string) => {
     // 1. Move camera
     interaction.handleCountryClick(code);
     
     // 2. Find inventions for this country to Pin the panel
     const countryInventions = inventionState.inventions.filter(inv => inv.countryCode === code);
+    
+    setPinnedCountry({
+      countryCode: code,
+      country: countryInventions.length > 0 ? countryInventions[0].country : name,
+      inventions: countryInventions
+    });
+
     if (countryInventions.length > 0) {
-      setPinnedCountry({
-        countryCode: code,
-        country: countryInventions[0].country,
-        inventions: countryInventions
-      });
-      setHoveredCountry(null);
+      setHasInteracted(true);
     }
+
+    setHoveredCountry(null);
   }, [interaction, inventionState.inventions]);
 
   const handleHoverPanelInventionClick = useCallback(
@@ -70,10 +79,10 @@ export default function Home() {
           INVENTRA
         </h1>
         <p
-          className="mt-1 text-[11px] tracking-[0.12em] text-[var(--text-secondary)]"
+          className="mt-2 text-sm tracking-[0.1em] text-[var(--text-secondary)] opacity-80"
           style={{ fontFamily: "var(--font-cormorant), serif", fontWeight: 400 }}
         >
-          Spin the planet. Discover who freaking invented
+          Explore the world&apos;s most impactful inventions through time.
         </p>
       </div>
 
@@ -104,7 +113,11 @@ export default function Home() {
 
       {/* Random Discovery — top-right */}
       <div className="absolute right-5 top-5 z-30">
-        <RandomDiscovery onViewOnGlobe={handleViewOnGlobe} />
+        <RandomDiscovery 
+          onViewOnGlobe={handleViewOnGlobe} 
+          onOpen={() => setIsRandomDiscoveryOpen(true)}
+          onClose={() => setIsRandomDiscoveryOpen(false)}
+        />
       </div>
 
       <Globe
@@ -116,29 +129,38 @@ export default function Home() {
         onInventionClick={interaction.handleInventionClick}
         onCountryHover={handleCountryHover}
         globeRef={globeRef}
+        hoveredCountry={hoveredCountry}
       />
+
 
       {/* Side panel — LEFT side (Fixed Search/List) */}
-      <div className="pointer-events-none absolute left-4 top-28 z-20 h-[calc(100vh-8rem)]">
-        <SidePanel
-          inventions={inventionState.filtered}
-          activeCategories={inventionState.activeCategories}
-          onToggleCategory={inventionState.toggleCategory}
-          onSelectInvention={interaction.handleCardClick}
-          searchValue={inventionState.searchQuery}
-          onSearchChange={inventionState.setSearchQuery}
-          onSearchSubmit={interaction.handleSearch}
-          isSearching={interaction.isSearching}
-        />
-      </div>
+      {!isRandomDiscoveryOpen && (
+        <div className="pointer-events-none absolute left-4 top-28 z-20 h-[calc(100vh-8rem)]">
+          <SidePanel
+            inventions={inventionState.filtered}
+            activeCategories={inventionState.activeCategories}
+            onToggleCategory={inventionState.toggleCategory}
+            onSelectInvention={interaction.handleCardClick}
+            searchValue={inventionState.searchQuery}
+            onSearchChange={inventionState.setSearchQuery}
+            onSearchSubmit={interaction.handleSearch}
+            isSearching={interaction.isSearching}
+          />
+        </div>
+      )}
 
       {/* Country discovery panel — cosmic space right of side panel */}
-      <CountryHoverPanel
-        data={pinnedCountry ?? hoveredCountry}
-        onInventionClick={handleHoverPanelInventionClick}
-        isPinned={!!pinnedCountry}
-        onClose={() => setPinnedCountry(null)}
-      />
+      {!isRandomDiscoveryOpen && hasInteracted && (
+        <CountryHoverPanel
+          data={pinnedCountry ?? hoveredCountry}
+          onInventionClick={handleHoverPanelInventionClick}
+          isPinned={!!pinnedCountry}
+          onClose={() => {
+            setPinnedCountry(null);
+            interaction.handleReset();
+          }}
+        />
+      )}
 
       {/* Invention Detail — RIGHT side */}
       {inventionState.selectedInvention && (
