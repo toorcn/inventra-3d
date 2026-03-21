@@ -2,7 +2,7 @@
 
 import { getInventionById } from "@/data/inventions";
 import { getComponentById } from "@/data/invention-components";
-import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery } from "@/types";
+import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery, ViewerState } from "@/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface UseExpertProps {

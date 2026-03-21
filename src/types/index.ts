@@ -78,10 +78,16 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface ViewerState {
+  isExploded: boolean;
+  highlightedComponentIds: string[];
+}
+
 export interface ChatRequest {
   messages: ChatMessage[];
   inventionId: string;
   componentId?: string | null;
+  viewerState?: ViewerState | null;
   sessionId?: string;
   clientMessageId?: string;
 }
