@@ -1,6 +1,7 @@
 "use client";
 
 import { ChatPanel } from "@/components/expert/ChatPanel";
+import { VoiceRoomControls } from "@/components/expert/VoiceRoomControls";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { ComponentInfo } from "@/components/viewer/ComponentInfo";
 import ModelViewer from "@/components/viewer/ModelViewer";
@@ -8,6 +9,8 @@ import { ViewerControls } from "@/components/viewer/ViewerControls";
 import { Badge } from "@/components/ui/Badge";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
+import { useAgoraVoice } from "@/hooks/useAgoraVoice";
+import { useExpert } from "@/hooks/useExpert";
 import type { ExpertAction } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -41,7 +44,9 @@ export default function InventionDetailPage() {
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [highlightMap, setHighlightMap] = useState<HighlightMap>({});
   const [beamEffect, setBeamEffect] = useState<BeamEffect | null>(null);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(true);
   const timeoutsRef = useRef<number[]>([]);
+  const lastVoiceStatusRef = useRef<"idle" | "connecting" | "live" | "error">("idle");
 
   const componentIdSet = useMemo(
     () => new Set(getComponentsByInventionId(invention.id).map((comp) => comp.id)),
@@ -141,6 +146,73 @@ export default function InventionDetailPage() {
     [componentIdSet, invention.hasModel],
   );
 
+  const {
+    appendMessage,
+    messages,
+    isLoading,
+    isSpeaking,
+    sendMessage,
+    suggestedQuestions,
+  } = useExpert({
+    inventionId: invention.id,
+    componentId: selectedComponentId,
+    onActions: handleExpertActions,
+  });
+
+  const voice = useAgoraVoice({
+    inventionId: invention.id,
+    componentId: selectedComponentId,
+  });
+
+  const isVoiceRoomActive = voice.status === "connecting" || voice.status === "live";
+  const shouldShowTranscriptRail = !isVoiceRoomActive || isTranscriptOpen;
+
+  useEffect(() => {
+    const previousStatus = lastVoiceStatusRef.current;
+
+    if (voice.status === "live" && previousStatus !== "live") {
+      appendMessage({
+        role: "system",
+        content: "Live voice room started. Spoken exchanges will stay in this transcript.",
+      });
+      setIsTranscriptOpen(false);
+    }
+
+    if (voice.status === "idle" && previousStatus === "live") {
+      appendMessage({
+        role: "system",
+        content: "Live voice room ended. The transcript remains available in this session.",
+      });
+      setIsTranscriptOpen(true);
+    }
+
+    if (voice.status === "error" && previousStatus !== "error") {
+      appendMessage({
+        role: "system",
+        content: voice.error
+          ? `Voice room error: ${voice.error}`
+          : "Voice room failed to start.",
+      });
+      setIsTranscriptOpen(true);
+    }
+
+    lastVoiceStatusRef.current = voice.status;
+  }, [appendMessage, voice.error, voice.status]);
+
+  const handleStartVoice = useCallback(() => {
+    setIsTranscriptOpen(false);
+    void voice.startVoice();
+  }, [voice.startVoice]);
+
+  const handleStopVoice = useCallback(() => {
+    setIsTranscriptOpen(true);
+    void voice.stopVoice();
+  }, [voice.stopVoice]);
+
+  const handleToggleTranscript = useCallback(() => {
+    setIsTranscriptOpen((current) => !current);
+  }, []);
+
   return (
     <main className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b border-white/5 px-4 py-3">
@@ -159,8 +231,8 @@ export default function InventionDetailPage() {
         <Badge category={invention.category} />
       </header>
 
-      <section className="flex flex-1 overflow-hidden">
-        <div className="relative flex-[2] bg-[radial-gradient(circle_at_center,_#1a1f3c_0%,_#0a0a1a_100%)]">
+      <section className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+        <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,_#1a1f3c_0%,_#0a0a1a_100%)]">
           {invention.hasModel ? (
             <>
               <ErrorBoundary>
@@ -173,6 +245,22 @@ export default function InventionDetailPage() {
                   onComponentSelect={setSelectedComponentId}
                 />
               </ErrorBoundary>
+
+              {(isVoiceRoomActive || voice.error) && (
+                <VoiceRoomControls
+                  status={
+                    voice.status === "error"
+                      ? "error"
+                      : voice.status === "connecting"
+                        ? "connecting"
+                        : "live"
+                  }
+                  isTranscriptOpen={isTranscriptOpen}
+                  voiceError={voice.error}
+                  onToggleTranscript={handleToggleTranscript}
+                  onStopVoice={handleStopVoice}
+                />
+              )}
               
               {/* Overlay Info Panel for Model View */}
               <div className="pointer-events-none absolute bottom-6 left-6 z-10 max-w-sm">
@@ -245,13 +333,22 @@ export default function InventionDetailPage() {
           )}
         </div>
 
-        <aside className="w-[420px] border-l border-white/5 bg-black/20">
-          <ChatPanel
-            inventionId={invention.id}
-            componentId={selectedComponentId}
-            onActions={handleExpertActions}
-          />
-        </aside>
+        {shouldShowTranscriptRail && (
+          <aside className="h-[40vh] border-t border-white/5 bg-black/20 lg:h-full lg:w-[420px] lg:border-l lg:border-t-0">
+            <ChatPanel
+              messages={messages}
+              isLoading={isLoading}
+              isSpeaking={isSpeaking}
+              suggestedQuestions={suggestedQuestions}
+              isVoiceActive={voice.status === "live"}
+              isVoiceConnecting={voice.status === "connecting"}
+              voiceError={voice.error}
+              onSendMessage={sendMessage}
+              onStartVoice={handleStartVoice}
+              onStopVoice={handleStopVoice}
+            />
+          </aside>
+        )}
       </section>
     </main>
   );

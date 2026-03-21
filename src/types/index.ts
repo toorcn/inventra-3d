@@ -67,11 +67,14 @@ export interface SearchResult {
   explanation: string;
 }
 
+export type TranscriptDelivery = "typed" | "spoken";
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   actions?: ExpertAction[];
+  delivery?: TranscriptDelivery;
   timestamp: number;
 }
 

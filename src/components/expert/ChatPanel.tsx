@@ -3,34 +3,35 @@
 import { ExpertAvatar } from "./ExpertAvatar";
 import { MessageBubble } from "./MessageBubble";
 import { SuggestedQuestions } from "./SuggestedQuestions";
-import { useAgoraVoice } from "@/hooks/useAgoraVoice";
-import { useExpert } from "@/hooks/useExpert";
-import type { ExpertAction } from "@/types";
+import type { ChatMessage, TranscriptDelivery } from "@/types";
 import { LoaderCircle, Mic, MicOff, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ChatPanelProps {
-  inventionId: string;
-  componentId?: string | null;
-  onActions?: (actions: ExpertAction[]) => void;
+  messages: ChatMessage[];
+  isLoading: boolean;
+  isSpeaking: boolean;
+  suggestedQuestions: string[];
+  isVoiceActive: boolean;
+  isVoiceConnecting: boolean;
+  voiceError: string | null;
+  onSendMessage: (content: string, options?: { delivery?: TranscriptDelivery }) => void;
+  onStartVoice: () => void;
+  onStopVoice: () => void;
 }
 
-export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProps) {
-  const { messages, isLoading, isSpeaking, sendMessage, suggestedQuestions } = useExpert({
-    inventionId,
-    componentId,
-    onActions,
-  });
-  const {
-    error: voiceError,
-    isActive: isVoiceActive,
-    isConnecting: isVoiceConnecting,
-    startVoice,
-    stopVoice,
-  } = useAgoraVoice({
-    inventionId,
-    componentId,
-  });
+export function ChatPanel({
+  messages,
+  isLoading,
+  isSpeaking,
+  suggestedQuestions,
+  isVoiceActive,
+  isVoiceConnecting,
+  voiceError,
+  onSendMessage,
+  onStartVoice,
+  onStopVoice,
+}: ChatPanelProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -42,18 +43,18 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
     const text = input.trim();
     if (!text || isLoading) return;
     setInput("");
-    sendMessage(text);
+    onSendMessage(text, { delivery: "typed" });
   };
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
-        <ExpertAvatar isSpeaking={isSpeaking} />
+        <ExpertAvatar isSpeaking={isSpeaking || isVoiceConnecting || isVoiceActive} />
         <div>
           <h3 className="text-sm font-semibold text-white">AI Expert</h3>
           <p className="text-xs text-[var(--text-secondary)]">
             {isVoiceActive
-              ? "Voice session live"
+              ? "Voice room live"
               : isVoiceConnecting
                 ? "Joining Agora voice..."
                 : isSpeaking
@@ -64,11 +65,11 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
         <button
           type="button"
           onClick={() => {
-            if (isVoiceActive) {
-              void stopVoice();
+            if (isVoiceActive || isVoiceConnecting) {
+              onStopVoice();
               return;
             }
-            void startVoice();
+            onStartVoice();
           }}
           disabled={isVoiceConnecting}
           className="ml-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
@@ -93,7 +94,7 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
           )}
           {isVoiceActive && (
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-xs text-cyan-100">
-              Agora voice is live. Spoken replies come from the voice agent, while typed questions still drive the visual tool actions.
+              Live voice mode is active. Spoken exchanges and typed follow-ups share the same transcript.
             </div>
           )}
           {messages.map((msg) => (
@@ -104,8 +105,12 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
               <div className="rounded-2xl rounded-bl-md border border-white/5 bg-white/[0.06] px-4 py-2.5 text-sm text-gray-400">
                 <span className="inline-flex gap-1">
                   <span className="animate-bounce">.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                  <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>
+                    .
+                  </span>
+                  <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>
+                    .
+                  </span>
                 </span>
               </div>
             </div>
@@ -117,7 +122,7 @@ export function ChatPanel({ inventionId, componentId, onActions }: ChatPanelProp
         questions={suggestedQuestions}
         onSelect={(q) => {
           setInput("");
-          sendMessage(q);
+          onSendMessage(q, { delivery: "typed" });
         }}
       />
 

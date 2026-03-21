@@ -10,6 +10,7 @@ InventorNet is a Next.js app for exploring breakthrough inventions around the wo
 - **Open an invention detail page** with a story/brief.
 - **Explore select inventions in 3D** with component picking and an exploded view.
 - **Ask the AI Expert** questions about the invention or a selected component.
+- **Enter a live voice room** where the transcript rail hides and returns with the same session transcript.
 
 > Note: without an API key, chat/search fall back to offline heuristics and a baseline response.
 
@@ -51,11 +52,15 @@ AGORA_LLM_URL=https://openrouter.ai/api/v1/chat/completions
 AGORA_LLM_API_KEY=...
 AGORA_LLM_MODEL=google/gemini-2.0-flash-001
 
-# Agora TTS provider config (example: Azure TTS).
-AGORA_TTS_VENDOR=microsoft
+# Agora TTS provider config (ElevenLabs recommended).
+AGORA_TTS_VENDOR=elevenlabs
 AGORA_TTS_KEY=...
+AGORA_TTS_VOICE_ID=...
+AGORA_TTS_MODEL_ID=eleven_multilingual_v2
+
+# Optional for non-ElevenLabs TTS providers.
 AGORA_TTS_REGION=...
-AGORA_TTS_VOICE_NAME=en-US-AndrewMultilingualNeural
+AGORA_TTS_VOICE_NAME=...
 ```
 
 ## Scripts

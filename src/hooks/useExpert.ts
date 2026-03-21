@@ -2,8 +2,8 @@
 
 import { getInventionById } from "@/data/inventions";
 import { getComponentById } from "@/data/invention-components";
-import type { ChatMessage, ChatResponse, ExpertAction } from "@/types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery } from "@/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface UseExpertProps {
   inventionId: string;
@@ -11,8 +11,30 @@ interface UseExpertProps {
   onActions?: (actions: ExpertAction[]) => void;
 }
 
+interface SendMessageOptions {
+  delivery?: TranscriptDelivery;
+}
+
+interface AppendMessageOptions {
+  role: ChatMessage["role"];
+  content: string;
+  actions?: ExpertAction[];
+  delivery?: TranscriptDelivery;
+}
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function createIntroMessage(invention: ReturnType<typeof getInventionById>): ChatMessage {
+  return {
+    id: "intro",
+    role: "assistant",
+    content: invention
+      ? `Welcome! I'm your AI guide for the **${invention.title}** (${invention.year}). ${invention.description.split(".")[0]}. Ask me anything about how it works, its history, or its components!`
+      : "Select an invention to begin exploring.",
+    timestamp: Date.now(),
+  };
 }
 
 function buildSuggestedQuestions(inventionId: string, componentId?: string | null): string[] {
@@ -41,24 +63,16 @@ function buildSuggestedQuestions(inventionId: string, componentId?: string | nul
 
 export function useExpert({ inventionId, componentId, onActions }: UseExpertProps) {
   const invention = getInventionById(inventionId);
-  const introMessage: ChatMessage = useMemo(
-    () => ({
-      id: "intro",
-      role: "assistant",
-      content: invention
-        ? `Welcome! I'm your AI guide for the **${invention.title}** (${invention.year}). ${invention.description.split(".")[0]}. Ask me anything about how it works, its history, or its components!`
-        : "Select an invention to begin exploring.",
-      timestamp: Date.now(),
-    }),
-    [invention],
-  );
-
+  const introMessage: ChatMessage = useMemo(() => createIntroMessage(invention), [invention]);
   const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const messagesRef = useRef<ChatMessage[]>([introMessage]);
 
   useEffect(() => {
-    setMessages([introMessage]);
+    const next = [introMessage];
+    messagesRef.current = next;
+    setMessages(next);
   }, [introMessage]);
 
   const suggestedQuestions = useMemo(
@@ -66,16 +80,34 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
     [inventionId, componentId],
   );
 
+  const appendMessage = useCallback((message: AppendMessageOptions) => {
+    const nextMessage: ChatMessage = {
+      id: uid(),
+      timestamp: Date.now(),
+      ...message,
+    };
+
+    setMessages((prev) => {
+      const next = [...prev, nextMessage];
+      messagesRef.current = next;
+      return next;
+    });
+  }, []);
+
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, options: SendMessageOptions = {}) => {
+      const delivery = options.delivery ?? "typed";
       const userMsg: ChatMessage = {
         id: uid(),
         role: "user",
         content,
+        delivery,
         timestamp: Date.now(),
       };
 
-      setMessages((prev) => [...prev, userMsg]);
+      const conversation = [...messagesRef.current, userMsg];
+      messagesRef.current = conversation;
+      setMessages(conversation);
       setIsLoading(true);
       setIsSpeaking(true);
 
@@ -86,7 +118,7 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           body: JSON.stringify({
             inventionId,
             componentId: componentId ?? undefined,
-            messages: [...messages, userMsg],
+            messages: conversation,
           }),
         });
 
@@ -102,10 +134,15 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           role: "assistant",
           content: assistantContent,
           actions: actions.length ? actions : undefined,
+          delivery,
           timestamp: Date.now(),
         };
 
-        setMessages((prev) => [...prev, assistantMsg]);
+        setMessages((prev) => {
+          const next = [...prev, assistantMsg];
+          messagesRef.current = next;
+          return next;
+        });
         if (actions.length) {
           onActions?.(actions);
         }
@@ -114,22 +151,30 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           id: uid(),
           role: "assistant",
           content: "Sorry, I encountered an error. Please try asking again.",
+          delivery,
           timestamp: Date.now(),
         };
-        setMessages((prev) => [...prev, errorMsg]);
+        setMessages((prev) => {
+          const next = [...prev, errorMsg];
+          messagesRef.current = next;
+          return next;
+        });
       } finally {
         setIsLoading(false);
         setIsSpeaking(false);
       }
     },
-    [inventionId, componentId, messages, onActions],
+    [inventionId, componentId, onActions],
   );
 
   const clearMessages = useCallback(() => {
-    setMessages([introMessage]);
+    const next = [introMessage];
+    messagesRef.current = next;
+    setMessages(next);
   }, [introMessage]);
 
   return {
+    appendMessage,
     messages,
     isLoading,
     isSpeaking,

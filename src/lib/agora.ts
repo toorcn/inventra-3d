@@ -18,8 +18,10 @@ type AgoraConfig = {
   llmModel: string;
   ttsVendor: string;
   ttsKey: string;
+  ttsVoiceId?: string;
   ttsRegion?: string;
   ttsVoiceName?: string;
+  ttsModelId?: string;
 };
 
 function readEnv(name: string): string | undefined {
@@ -60,8 +62,10 @@ export function getAgoraConfig(): AgoraConfig {
     llmModel: readEnv("AGORA_LLM_MODEL") ?? DEFAULT_LLM_MODEL,
     ttsVendor,
     ttsKey: ttsKey!,
+    ttsVoiceId: readEnv("AGORA_TTS_VOICE_ID"),
     ttsRegion: readEnv("AGORA_TTS_REGION"),
     ttsVoiceName: readEnv("AGORA_TTS_VOICE_NAME"),
+    ttsModelId: readEnv("AGORA_TTS_MODEL_ID"),
   };
 }
 
@@ -107,6 +111,16 @@ function buildTtsParams(config: AgoraConfig): Record<string, string> {
   const params: Record<string, string> = {
     key: config.ttsKey,
   };
+
+  if (config.ttsVendor.toLowerCase() === "elevenlabs") {
+    if (config.ttsVoiceId) {
+      params.voice_id = config.ttsVoiceId;
+    }
+    if (config.ttsModelId) {
+      params.model_id = config.ttsModelId;
+    }
+    return params;
+  }
 
   if (config.ttsRegion) {
     params.region = config.ttsRegion;
