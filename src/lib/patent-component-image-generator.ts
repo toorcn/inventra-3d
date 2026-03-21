@@ -45,23 +45,60 @@ export async function generatePatentComponentImageVariant(
   variant: PatentImageVariant,
 ): Promise<PatentGeneratedImageAsset> {
   const diskPaths = await ensurePatentWorkspaceDirectories(workspacePatentId);
-  const evidence = [...component.evidence]
-    .sort(
-      (a, b) =>
-        (b.qualityScore ?? 0.5) - (a.qualityScore ?? 0.5) ||
-        b.confidence - a.confidence ||
-        a.pageNumber - b.pageNumber,
-    )
-    .slice(0, variant === "three_d_source" ? 4 : 3);
-  const supportingFigureIds = component.supportingContext?.supportingFigureIds ?? component.evidence.map((item) => item.figureId);
-  const figureFallbackImages = workspace.figures
-    .filter((figure) => supportingFigureIds.includes(figure.id))
-    .slice(0, component.evidenceMode === "contextual_inferred" ? 2 : 1)
-    .map((figure) => ({
-      imagePath: figure.imagePath,
-      imageFilename: figure.filename,
-    }));
-  const referenceImageSources = [...evidence, ...figureFallbackImages].slice(0, variant === "three_d_source" ? 4 : 3);
+  const maxImages = variant === "three_d_source" ? 4 : 3;
+  const sortedEvidence = [...component.evidence].sort(
+    (a, b) =>
+      (b.qualityScore ?? 0.5) - (a.qualityScore ?? 0.5) ||
+      b.confidence - a.confidence ||
+      a.pageNumber - b.pageNumber,
+  );
+
+  let referenceImageSources: { imagePath: string; imageFilename: string }[];
+
+  if (
+    component.evidenceMode === "figure_context" ||
+    component.evidenceMode === "contextual_inferred"
+  ) {
+    // Use full figure page images instead of individual crops
+    const figureIds =
+      component.supportingContext?.supportingFigureIds ??
+      component.evidence.map((item) => item.figureId);
+    const figureSources = workspace.figures
+      .filter((figure) => figureIds.includes(figure.id))
+      .slice(0, maxImages)
+      .map((figure) => ({
+        imagePath: figure.imagePath,
+        imageFilename: figure.filename,
+      }));
+
+    // Fallback: if no supporting figures found, derive figure IDs from evidence
+    if (figureSources.length === 0) {
+      const evidenceFigureIds = [...new Set(component.evidence.map((e) => e.figureId))];
+      referenceImageSources = workspace.figures
+        .filter((figure) => evidenceFigureIds.includes(figure.id))
+        .slice(0, maxImages)
+        .map((figure) => ({
+          imagePath: figure.imagePath,
+          imageFilename: figure.filename,
+        }));
+    } else {
+      referenceImageSources = figureSources;
+    }
+  } else {
+    // Existing logic: use individual crop images, with figure pages as fallback
+    const evidence = sortedEvidence.slice(0, maxImages);
+    const supportingFigureIds =
+      component.supportingContext?.supportingFigureIds ??
+      component.evidence.map((item) => item.figureId);
+    const figureFallbackImages = workspace.figures
+      .filter((figure) => supportingFigureIds.includes(figure.id))
+      .slice(0, component.evidenceMode === "contextual_inferred" ? 2 : 1)
+      .map((figure) => ({
+        imagePath: figure.imagePath,
+        imageFilename: figure.filename,
+      }));
+    referenceImageSources = [...evidence, ...figureFallbackImages].slice(0, maxImages);
+  }
   const referenceImages = await Promise.all(
     referenceImageSources.map(async (item) => {
       const absolutePath = path.join(process.cwd(), "public", item.imagePath.replace(/^\/+/, ""));
