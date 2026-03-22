@@ -22,9 +22,11 @@ export interface Invention {
 }
 
 export interface GeometryDef {
-  type: "box" | "sphere" | "cylinder" | "torus" | "torusKnot" | "plane" | "roundedBox";
+  type: "box" | "sphere" | "cylinder" | "torus" | "torusKnot" | "plane" | "roundedBox" | "glb";
   args: number[];
   rotation?: [number, number, number];
+  /** Path relative to public/, e.g. "models/us223898/body.glb" */
+  glbUrl?: string;
 }
 
 export interface InventionComponent {

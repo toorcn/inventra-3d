@@ -6,6 +6,7 @@ import type { GeometryDef } from "@/types";
 import type { ComponentModel } from "@/data/models";
 import { useState } from "react";
 import * as THREE from "three";
+import { GlbMesh } from "./GlbMesh";
 
 interface ComponentMeshProps {
   model: ComponentModel;
@@ -36,6 +37,10 @@ function GeometryFromDef({ def }: { def: GeometryDef }) {
 }
 
 export function ComponentMesh({ model, isSelected, highlight, onSelect }: ComponentMeshProps) {
+  if (model.geometry.type === "glb" && model.geometry.glbUrl) {
+    return <GlbMesh model={model} isSelected={isSelected} highlight={highlight} onSelect={onSelect} />;
+  }
+
   const [hovered, setHovered] = useState(false);
 
   const handleClick = (e: { stopPropagation?: () => void }) => {
