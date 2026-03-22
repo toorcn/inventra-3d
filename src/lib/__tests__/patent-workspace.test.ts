@@ -1,0 +1,200 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyPatentReviewAction,
+  createPatentWorkspaceManifest,
+  updatePatentComponentGeneration,
+  type PatentWorkspaceManifest,
+} from "@/lib/patent-workspace";
+
+function buildWorkspace(): PatentWorkspaceManifest {
+  return createPatentWorkspaceManifest({
+    patentId: "sample-patent",
+    sourceFilename: "sample.pdf",
+    totalPages: 10,
+    processedPages: 3,
+    extractedAt: "2026-03-22T00:00:00.000Z",
+    extractedText: "sample extracted text",
+    warnings: [],
+    capabilities: {
+      imageGeneration: true,
+      threeDGeneration: true,
+    },
+    paths: {
+      outputDirectory: "/patents/sample-patent",
+      manifestPath: "/patents/sample-patent/manifest.json",
+      textPath: "/patents/sample-patent/full-text.txt",
+      candidateDirectory: "/patents/sample-patent/components/candidates",
+      generatedDirectory: "/patents/sample-patent/components/generated",
+      threeDDirectory: "/patents/sample-patent/components/3d",
+    },
+    figures: [
+      {
+        id: "fig-1",
+        filename: "page-1-fig-1.png",
+        imagePath: "/patents/sample-patent/page-1-fig-1.png",
+        pageNumber: 1,
+        label: "FIG. 1",
+        description: "Overview of the writing tip assembly.",
+        role: "irrelevant",
+        relationToRootProduct: "Awaiting patent-level product planning.",
+        assemblyHint: null,
+        analysisSource: "vision",
+        failureReason: null,
+        cropRegion: null,
+        components: [],
+        pageTextSnippet: "text",
+        componentDetections: [
+          {
+            id: "fig-1-tip",
+            name: "roller ball tip",
+            refNumber: "5",
+            summary: "Rolling tip at the end of the pen.",
+            functionDescription: "Transfers ink to the page.",
+            kind: "component",
+            confidence: 0.92,
+            region: null,
+            imageFilename: "candidate-tip.png",
+            imagePath: "/patents/sample-patent/components/candidates/candidate-tip.png",
+            sourceFigureId: "fig-1",
+          },
+          {
+            id: "fig-1-seat",
+            name: "tip seat",
+            refNumber: "31",
+            summary: "Socket supporting the rolling tip.",
+            functionDescription: "Retains the tip while allowing rotation.",
+            kind: "subassembly",
+            confidence: 0.81,
+            region: null,
+            imageFilename: "candidate-seat.png",
+            imagePath: "/patents/sample-patent/components/candidates/candidate-seat.png",
+            sourceFigureId: "fig-1",
+          },
+          {
+            id: "fig-1-edge",
+            name: "front edge portion",
+            refNumber: "32",
+            summary: "Front edge portion of the tip seat 31.",
+            functionDescription: "Defines an edge feature on the tip seat 31.",
+            kind: "component",
+            confidence: 0.74,
+            region: null,
+            imageFilename: "candidate-edge.png",
+            imagePath: "/patents/sample-patent/components/candidates/candidate-edge.png",
+            sourceFigureId: "fig-1",
+          },
+        ],
+      },
+      {
+        id: "fig-8",
+        filename: "page-5-fig-8.png",
+        imagePath: "/patents/sample-patent/page-5-fig-8.png",
+        pageNumber: 5,
+        label: "FIG. 8",
+        description: "Detail of the writing tip.",
+        role: "irrelevant",
+        relationToRootProduct: "Awaiting patent-level product planning.",
+        assemblyHint: null,
+        analysisSource: "vision",
+        failureReason: null,
+        cropRegion: null,
+        components: [],
+        pageTextSnippet: "text",
+        componentDetections: [
+          {
+            id: "fig-8-tip",
+            name: "roller ball tip",
+            refNumber: "5",
+            summary: "Detailed view of the rolling tip.",
+            functionDescription: "Transfers ink to the page.",
+            kind: "component",
+            confidence: 0.88,
+            region: null,
+            imageFilename: "candidate-tip-detail.png",
+            imagePath: "/patents/sample-patent/components/candidates/candidate-tip-detail.png",
+            sourceFigureId: "fig-8",
+          },
+        ],
+      },
+    ],
+  });
+}
+
+describe("createPatentWorkspaceManifest", () => {
+  it("creates multiple raw candidates from a single figure", () => {
+    const workspace = buildWorkspace();
+    expect(workspace.componentCandidates).toHaveLength(4);
+  });
+
+  it("collapses repeated part views into one canonical component", () => {
+    const workspace = buildWorkspace();
+    const tipComponent = workspace.componentLibrary.find((component) => component.refNumbers.includes("5"));
+
+    expect(workspace.componentLibrary).toHaveLength(3);
+    expect(tipComponent?.evidence).toHaveLength(2);
+    expect(workspace.stats.rawCandidateCount).toBe(4);
+  });
+
+  it("creates a patent-level root product and non-empty assembly graph", () => {
+    const workspace = buildWorkspace();
+
+    expect(workspace.productModel.rootProductName).toBe("roller ball tip");
+    expect(workspace.featured.heroComponentId).toBeTruthy();
+    expect(workspace.featured.rootAssemblyId).toBe("sample-patent-full-product");
+    expect(workspace.featured.subassemblyAssemblyIds.length).toBeGreaterThan(0);
+    expect(workspace.assemblies.length).toBeGreaterThan(1);
+  });
+
+  it("builds a reference index and attaches feature-only refs to a parent", () => {
+    const workspace = buildWorkspace();
+    const edgeReference = workspace.referenceIndex.find((reference) => reference.refNumber === "32");
+    const edgeComponent = workspace.componentLibrary.find((component) => component.canonicalRefNumber === "32");
+
+    expect(edgeReference?.canonicalLabel).toBe("front edge portion");
+    expect(edgeComponent?.buildableStatus).toBe("feature_only");
+    expect(edgeComponent?.reviewStatus).toBe("redundant");
+    expect(edgeComponent?.mergeTargetId).toBeTruthy();
+  });
+});
+
+describe("applyPatentReviewAction", () => {
+  it("merges one canonical component into another and marks the source redundant", () => {
+    const workspace = buildWorkspace();
+    const [first, second] = workspace.componentLibrary;
+    const merged = applyPatentReviewAction(workspace, {
+      type: "merge",
+      componentId: second.id,
+      targetComponentId: first.id,
+    });
+
+    const target = merged.componentLibrary.find((component) => component.id === first.id);
+    const source = merged.componentLibrary.find((component) => component.id === second.id);
+
+    expect(target?.evidence.length).toBeGreaterThanOrEqual(3);
+    expect(source?.reviewStatus).toBe("redundant");
+    expect(source?.mergeTargetId).toBe(first.id);
+  });
+});
+
+describe("updatePatentComponentGeneration", () => {
+  it("updates generation state without dropping generated assets", () => {
+    const workspace = buildWorkspace();
+    const componentId = workspace.componentLibrary[0].id;
+
+    const generated = updatePatentComponentGeneration(workspace, componentId, {
+      generationStatus: "succeeded",
+      generationError: null,
+      generatedAsset: {
+        outputPath: "/patents/sample-patent/components/generated/tip.png",
+        outputFilename: "tip.png",
+        model: "fal-ai/nano-banana-pro/edit",
+        generatedAt: "2026-03-22T00:00:00.000Z",
+        variant: "realistic_display",
+      },
+    });
+
+    const component = generated.componentLibrary.find((item) => item.id === componentId);
+    expect(component?.imageVariants.realistic_display.status).toBe("succeeded");
+    expect(component?.imageVariants.realistic_display.asset?.outputFilename).toBe("tip.png");
+  });
+});

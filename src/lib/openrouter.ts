@@ -10,7 +10,7 @@ type CompletionOptions = {
 };
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "google/gemini-2.0-flash-001";
+const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
 
 function hasApiKey(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY?.trim());
@@ -30,10 +30,15 @@ export async function chatCompletion(
   options: CompletionOptions = {},
 ): Promise<string> {
   if (!hasApiKey()) {
+    console.info("[InventorNet][OpenRouter] Chat completion running in offline fallback mode");
     const prompt = messages[messages.length - 1]?.content ?? "";
     return `I'm currently operating in offline mode. For \"${prompt}\", I can tell you that this relates to the fundamental principles of the invention's design and history. To get more detailed AI-generated insights, please ensure the system is fully connected.`;
   }
 
+  console.info("[InventorNet][OpenRouter] Stage: sending chat completion request", {
+    model: options.model ?? DEFAULT_MODEL,
+    messageCount: messages.length,
+  });
   const response = await fetch(OPENROUTER_BASE_URL, {
     method: "POST",
     headers: getHeaders(),
@@ -47,10 +52,15 @@ export async function chatCompletion(
 
   if (!response.ok) {
     const body = await response.text();
+    console.error("[InventorNet][OpenRouter] Chat completion failed", {
+      status: response.status,
+      body,
+    });
     throw new Error(`OpenRouter completion failed (${response.status}): ${body}`);
   }
 
   const payload = await response.json();
+  console.info("[InventorNet][OpenRouter] Stage passed: chat completion response received");
   return payload?.choices?.[0]?.message?.content ?? "";
 }
 
@@ -60,9 +70,14 @@ export async function structuredOutput<T>(
   options: CompletionOptions = {},
 ): Promise<T> {
   if (!hasApiKey()) {
+    console.info("[InventorNet][OpenRouter] Structured output requested without API key");
     throw new Error("structuredOutput requires OPENROUTER_API_KEY");
   }
 
+  console.info("[InventorNet][OpenRouter] Stage: sending structured output request", {
+    model: options.model ?? DEFAULT_MODEL,
+    messageCount: messages.length,
+  });
   const response = await fetch(OPENROUTER_BASE_URL, {
     method: "POST",
     headers: getHeaders(),
@@ -84,15 +99,21 @@ export async function structuredOutput<T>(
 
   if (!response.ok) {
     const body = await response.text();
+    console.error("[InventorNet][OpenRouter] Structured output failed", {
+      status: response.status,
+      body,
+    });
     throw new Error(`OpenRouter structured output failed (${response.status}): ${body}`);
   }
 
   const payload = await response.json();
   const content = payload?.choices?.[0]?.message?.content;
   if (typeof content !== "string") {
+    console.error("[InventorNet][OpenRouter] Structured output returned empty content");
     throw new Error("OpenRouter structured output returned empty content");
   }
 
+  console.info("[InventorNet][OpenRouter] Stage passed: structured output response received");
   return JSON.parse(content) as T;
 }
 

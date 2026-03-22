@@ -78,14 +78,26 @@ function parseWithHeuristics(query: string): SearchFilters {
 export async function parseSearchQuery(query: string): Promise<SearchFilters> {
   const normalized = query.trim();
   if (!normalized) {
+    console.info("[InventorNet][Search] Empty query received, skipping parsing");
     return {};
   }
 
   if (!process.env.OPENROUTER_API_KEY) {
-    return parseWithHeuristics(normalized);
+    console.info("[InventorNet][Search] Stage: parsing with offline heuristics", {
+      query: normalized,
+    });
+    const heuristicsResult = parseWithHeuristics(normalized);
+    console.info("[InventorNet][Search] Stage passed: offline heuristic parsing complete", {
+      filters: heuristicsResult,
+    });
+    return heuristicsResult;
   }
 
   try {
+    console.info("[InventorNet][Search] Stage: requesting structured AI parsing", {
+      query: normalized,
+    });
+
     const schema = {
       type: "object",
       properties: {
@@ -120,8 +132,16 @@ export async function parseSearchQuery(query: string): Promise<SearchFilters> {
       schema,
     );
 
+    console.info("[InventorNet][Search] Stage passed: structured AI parsing complete", {
+      filters: parsed,
+    });
     return { ...parsed, query: normalized };
-  } catch {
-    return parseWithHeuristics(normalized);
+  } catch (error) {
+    console.warn("[InventorNet][Search] Structured parsing failed, falling back to heuristics", error);
+    const fallback = parseWithHeuristics(normalized);
+    console.info("[InventorNet][Search] Stage passed: heuristic fallback complete", {
+      filters: fallback,
+    });
+    return fallback;
   }
 }

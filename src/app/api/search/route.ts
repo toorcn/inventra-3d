@@ -49,10 +49,26 @@ function applyFilters(dataset: Invention[], filters: SearchFilters): Invention[]
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    console.info("[InventorNet][API][Search] Request received");
     const body = (await request.json()) as { query?: string };
     const query = body.query?.trim() ?? "";
+    console.info("[InventorNet][API][Search] Stage passed: request body parsed", {
+      query,
+    });
+
+    console.info("[InventorNet][API][Search] Stage: parsing query");
     const filters = await parseSearchQuery(query);
+
+    console.info("[InventorNet][API][Search] Stage passed: query parsed", {
+      filters,
+    });
+
+    console.info("[InventorNet][API][Search] Stage: applying filters to dataset");
     const matches = applyFilters(inventions, filters);
+
+    console.info("[InventorNet][API][Search] Search complete", {
+      matchCount: matches.length,
+    });
 
     return Response.json({
       filters,
@@ -61,6 +77,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown search error";
+    console.error("[InventorNet][API][Search] Request failed", error);
     return Response.json({ error: message }, { status: 500 });
   }
 }

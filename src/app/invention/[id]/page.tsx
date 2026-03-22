@@ -1,12 +1,5 @@
-"use client";
-
-import { ChatPanel } from "@/components/expert/ChatPanel";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { ComponentInfo } from "@/components/viewer/ComponentInfo";
-import ModelViewer from "@/components/viewer/ModelViewer";
-import { ViewerControls } from "@/components/viewer/ViewerControls";
-import { Badge } from "@/components/ui/Badge";
-import { getComponentsByInventionId } from "@/data/invention-components";
+import { notFound } from "next/navigation";
+import { InventionDetailPageClient } from "@/components/discovery/InventionDetailPageClient";
 import { getInventionById } from "@/data/inventions";
 import { useExpert } from "@/hooks/useExpert";
 import { useGestureControls } from "@/hooks/useGestureControls";
@@ -22,13 +15,10 @@ import { notFound, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
-type HighlightMap = Record<string, { color?: string; mode?: "glow" | "pulse" }>;
-type BeamEffect = {
-  id: string;
-  fromComponentId: string;
-  toComponentId: string;
-  color?: string;
-  thickness?: number;
+type InventionDetailPageProps = {
+  params: Promise<{
+    id: string;
+  }>;
 };
 
 function uid() {
