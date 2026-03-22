@@ -1,4 +1,4 @@
-import { task, logger } from "@trigger.dev/sdk/v3";
+import { task, logger, AbortTaskRunError } from "@trigger.dev/sdk/v3";
 import { parsePdfTask } from "./tasks/parse-pdf";
 import { analyzePatentTask } from "./tasks/analyze-patent";
 import { identifyFiguresTask } from "./tasks/identify-figures";
@@ -6,6 +6,7 @@ import { cropFiguresTask } from "./tasks/crop-figures";
 import { generateMeshesTask } from "./tasks/generate-meshes";
 import { calculatePositionsTask } from "./tasks/calculate-positions";
 import { writeOutputTask } from "./tasks/write-output";
+import { inventions } from "../src/data/inventions";
 
 export interface PatentPipelinePayload {
   pdfPath: string;
@@ -35,6 +36,16 @@ export const patentPipelineTask = task({
       .triggerAndWait({ pages: parsedPdf.pages })
       .unwrap();
     logger.info("Patent analyzed", { title: patentAnalysis.title });
+
+    // Check for duplicate patent
+    const existingInvention = inventions.find(
+      (inv) => inv.id === patentAnalysis.id || inv.patentNumber === patentAnalysis.patentNumber,
+    );
+    if (existingInvention) {
+      throw new AbortTaskRunError(
+        `Patent already exists: "${existingInvention.title}" (${existingInvention.id})`,
+      );
+    }
 
     // Step 3: Identify 3D-convertible figures
     const figureAnalysis = await identifyFiguresTask

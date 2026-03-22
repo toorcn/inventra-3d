@@ -119,14 +119,14 @@ Set up the background job infrastructure and implement PDF-to-image conversion.
 
 **Tasks:**
 
-- [ ] Install dependencies: `@trigger.dev/sdk`, `unpdf`, `pdfjs-dist`, `@napi-rs/canvas`
-- [ ] Move `@fal-ai/client` from devDependencies to dependencies
-- [ ] Create `trigger.config.ts` at project root with project ref, `dirs: ["./trigger"]`, retry defaults
-- [ ] Create `trigger/patent-pipeline.ts` — orchestrator task that chains subtasks
-- [ ] Create `trigger/tasks/parse-pdf.ts` — accepts PDF buffer (or uploaded file URL), renders each page as PNG using unpdf, returns array of `{ pageNumber, imageBase64, text }` (text extracted via pdfjs getTextContent)
-- [ ] Create `POST /api/ingest/route.ts` — accepts multipart form upload, validates (max 20MB, PDF content-type, not encrypted), saves to `/tmp`, triggers the pipeline task, returns `{ jobId }`
-- [ ] Create `GET /api/ingest/[jobId]/status/route.ts` — calls `runs.retrieve()` and returns job status + progress
-- [ ] Update `package.json` dev script to run Trigger.dev dev alongside Next.js using concurrently
+- [x] Install dependencies: `@trigger.dev/sdk`, `unpdf`, `pdfjs-dist`, `@napi-rs/canvas`
+- [x] Move `@fal-ai/client` from devDependencies to dependencies
+- [x] Create `trigger.config.ts` at project root with project ref, `dirs: ["./trigger"]`, retry defaults
+- [x] Create `trigger/patent-pipeline.ts` — orchestrator task that chains subtasks
+- [x] Create `trigger/tasks/parse-pdf.ts` — accepts PDF buffer (or uploaded file URL), renders each page as PNG using unpdf, returns array of `{ pageNumber, imageBase64, text }` (text extracted via pdfjs getTextContent)
+- [x] Create `POST /api/ingest/route.ts` — accepts multipart form upload, validates (max 20MB, PDF content-type, not encrypted), saves to `/tmp`, triggers the pipeline task, returns `{ jobId }`
+- [x] Create `GET /api/ingest/[jobId]/status/route.ts` — calls `runs.retrieve()` and returns job status + progress
+- [x] Update `package.json` dev script to run Trigger.dev dev alongside Next.js using concurrently
 - [ ] Add `FAL_KEY` and `TRIGGER_SECRET_KEY` to `.env.local` documentation
 
 **Files to create/modify:**
@@ -139,10 +139,10 @@ Set up the background job infrastructure and implement PDF-to-image conversion.
 - `.env.local` (modify — add keys)
 
 **Success criteria:**
-- [ ] `npx trigger.dev@latest dev` runs alongside `next dev`
-- [ ] Uploading a PDF via `/api/ingest` triggers a background job and returns a job ID
-- [ ] The parse-pdf task extracts text and renders pages as PNG images
-- [ ] `/api/ingest/[jobId]/status` returns current job state
+- [x] `npx trigger.dev@latest dev` runs alongside `next dev`
+- [x] Uploading a PDF via `/api/ingest` triggers a background job and returns a job ID
+- [x] The parse-pdf task extracts text and renders pages as PNG images
+- [x] `/api/ingest/[jobId]/status` returns current job state
 
 ---
 
@@ -152,7 +152,7 @@ Use multimodal LLM to extract patent metadata and identify 3D-convertible figure
 
 **Tasks:**
 
-- [ ] Create `trigger/tasks/analyze-patent.ts` — sends page images + extracted text to OpenRouter multimodal LLM. Uses `structuredOutput<T>` pattern from existing `src/lib/openrouter.ts`. Extracts:
+- [x] Create `trigger/tasks/analyze-patent.ts` — sends page images + extracted text to OpenRouter multimodal LLM. Uses `structuredOutput<T>` pattern from existing `src/lib/openrouter.ts`. Extracts:
   ```typescript
   interface PatentAnalysis {
     title: string;
@@ -168,7 +168,7 @@ Use multimodal LLM to extract patent metadata and identify 3D-convertible figure
   ```
   Validates extracted `category` against the `CategoryId` union. Validates `year` is between 1700-2030. Validates `countryCode` is a valid ISO alpha-2 code. Generates a URL-safe `id` slug from the patent number (e.g., `"us-223898"`), checking for collisions against existing inventions.
 
-- [ ] Create `trigger/tasks/identify-figures.ts` — sends page images to multimodal LLM asking it to:
+- [x] Create `trigger/tasks/identify-figures.ts` — sends page images to multimodal LLM asking it to:
   1. Identify which figures show 3D-representable objects (not flowcharts, circuit diagrams, or graphs)
   2. For each figure, describe what subassembly it represents
   3. Return bounding box coordinates (x, y, width, height as percentages of page dimensions) for cropping
@@ -191,22 +191,22 @@ Use multimodal LLM to extract patent metadata and identify 3D-convertible figure
   }
   ```
 
-- [ ] Create `trigger/tasks/crop-figures.ts` — takes page images and bounding boxes, uses `@napi-rs/canvas` to crop each figure region, uploads cropped images to fal.ai storage via `fal.storage.upload()`, returns array of image URLs
+- [x] Create `trigger/tasks/crop-figures.ts` — takes page images and bounding boxes, uses `@napi-rs/canvas` to crop each figure region, uploads cropped images to fal.ai storage via `fal.storage.upload()`, returns array of image URLs
 
-- [ ] Wire subtasks into `trigger/patent-pipeline.ts` orchestrator using `triggerAndWait().unwrap()` with idempotency keys
+- [x] Wire subtasks into `trigger/patent-pipeline.ts` orchestrator using `triggerAndWait().unwrap()` with idempotency keys
 
 **Files to create/modify:**
 - `trigger/tasks/analyze-patent.ts` (create)
 - `trigger/tasks/identify-figures.ts` (create)
 - `trigger/tasks/crop-figures.ts` (create)
 - `trigger/patent-pipeline.ts` (modify — wire in subtasks)
-- `src/lib/openrouter.ts` (may need to add image support to `structuredOutput` if not already multimodal)
+- `src/lib/openrouter.ts` (modified — added multimodal message support)
 
 **Success criteria:**
-- [ ] Given a patent PDF, the pipeline extracts correct metadata (title, year, inventors, etc.)
-- [ ] The AI identifies relevant figures and provides bounding boxes
-- [ ] Cropped figure images are uploaded to fal.ai storage and accessible via URL
-- [ ] Invalid metadata is caught by validation (bad category, out-of-range year, etc.)
+- [x] Given a patent PDF, the pipeline extracts correct metadata (title, year, inventors, etc.)
+- [x] The AI identifies relevant figures and provides bounding boxes
+- [x] Cropped figure images are uploaded to fal.ai storage and accessible via URL
+- [x] Invalid metadata is caught by validation (bad category, out-of-range year, etc.)
 
 ---
 
@@ -216,14 +216,14 @@ Generate `.glb` meshes and write all output files.
 
 **Tasks:**
 
-- [ ] Create `trigger/tasks/generate-meshes.ts` — for each cropped figure URL, calls `fal.subscribe("fal-ai/trellis-2", { input: { image_url, resolution: 1024, texture_size: 2048 } })`. Downloads the `.glb` from `result.data.model_glb.url`. Returns array of `{ componentName, glbBuffer }`. Retry policy: 2 attempts per Trellis call with exponential backoff. If a call fails after retries, skip that component (minimum 1 component must succeed).
+- [x] Create `trigger/tasks/generate-meshes.ts` — for each cropped figure URL, calls `fal.subscribe("fal-ai/trellis-2", { input: { image_url, resolution: 1024, texture_size: 2048 } })`. Downloads the `.glb` from `result.data.model_glb.url`. Returns array of `{ componentName, glbBuffer }`. Retry policy: 2 attempts per Trellis call with exponential backoff. If a call fails after retries, skip that component (minimum 1 component must succeed).
 
-- [ ] Create `trigger/tasks/calculate-positions.ts` — given the AI's `spatialHint` for each component, calculates `assembledPosition` and `explodedPosition` tuples:
+- [x] Create `trigger/tasks/calculate-positions.ts` — given the AI's `spatialHint` for each component, calculates `assembledPosition` and `explodedPosition` tuples:
   - Assembled: pack components based on spatial hints (center at origin, arrange others relative)
   - Exploded: radially distribute components outward from center, spacing based on component count
   - Camera position: compute bounding sphere of all assembled positions, place camera at 2x radius
 
-- [ ] Create `trigger/tasks/write-output.ts` — the final step that:
+- [x] Create `trigger/tasks/write-output.ts` — the final step that:
   1. Saves `.glb` files to `public/models/<invention-id>/<component-slug>.glb`
   2. Reads existing generated data files (or creates them if first run)
   3. Appends new invention to `src/data/generated/inventions-generated.ts`
@@ -231,12 +231,12 @@ Generate `.glb` meshes and write all output files.
   5. Appends new model definition to `src/data/generated/models-generated.ts`
   6. Uses JSON.stringify for data + a code template wrapper to produce valid TypeScript
 
-- [ ] Create `src/data/generated/inventions-generated.ts` (initial empty file with typed export)
-- [ ] Create `src/data/generated/components-generated.ts` (initial empty file)
-- [ ] Create `src/data/generated/models-generated.ts` (initial empty file)
-- [ ] Update `src/data/inventions.ts` — import and merge `generatedInventions`
-- [ ] Update `src/data/invention-components.ts` — import and merge `generatedComponents`
-- [ ] Update `src/data/models.ts` — import and merge `generatedModelDefinitions`, update `getModelDefinitionByInventionId` to search both
+- [x] Create `src/data/generated/inventions-generated.ts` (initial empty file with typed export)
+- [x] Create `src/data/generated/components-generated.ts` (initial empty file)
+- [x] Create `src/data/generated/models-generated.ts` (initial empty file)
+- [x] Update `src/data/inventions.ts` — import and merge `generatedInventions`
+- [x] Update `src/data/invention-components.ts` — import and merge `generatedComponents`
+- [x] Update `src/data/models.ts` — import and merge `generatedModelDefinitions`, update `getModelDefinitionByInventionId` to search both
 
 **Files to create/modify:**
 - `trigger/tasks/generate-meshes.ts` (create)
@@ -251,12 +251,12 @@ Generate `.glb` meshes and write all output files.
 - `trigger/patent-pipeline.ts` (modify — wire in final subtasks)
 
 **Success criteria:**
-- [ ] `.glb` files are saved to `public/models/<id>/` and are servable
-- [ ] Generated TypeScript files contain valid, type-checked code
-- [ ] After dev server restart, the new invention appears on the globe
-- [ ] Clicking the invention opens the detail page with working 3D viewer showing `.glb` meshes
-- [ ] Exploded view works with the generated component positions
-- [ ] Existing hand-curated inventions continue to work unchanged
+- [x] `.glb` files are saved to `public/models/<id>/` and are servable
+- [x] Generated TypeScript files contain valid, type-checked code
+- [x] After dev server restart, the new invention appears on the globe
+- [x] Clicking the invention opens the detail page with working 3D viewer showing `.glb` meshes
+- [x] Exploded view works with the generated component positions
+- [x] Existing hand-curated inventions continue to work unchanged
 
 ---
 
@@ -266,22 +266,22 @@ Build the user-facing interface for uploading patents and monitoring progress.
 
 **Tasks:**
 
-- [ ] Create new route `src/app/ingest/page.tsx` — the upload page with:
+- [x] Create new route `src/app/ingest/page.tsx` — the upload page with:
   - Drag-and-drop file zone (or file input) accepting `.pdf` files
   - File size validation (max 20MB client-side)
   - Upload button that POSTs to `/api/ingest`
   - After upload, transitions to a progress view showing job status
 
-- [ ] Create `src/components/ingest/UploadForm.tsx` — the upload form component
-- [ ] Create `src/components/ingest/PipelineProgress.tsx` — polls `/api/ingest/[jobId]/status` every 3 seconds. Shows step-by-step progress:
+- [x] Create `src/components/ingest/UploadForm.tsx` — the upload form component
+- [x] Create `src/components/ingest/PipelineProgress.tsx` — polls `/api/ingest/[jobId]/status` every 3 seconds. Shows step-by-step progress:
   - Parsing PDF...
   - Analyzing patent...
   - Identifying figures...
   - Generating 3D models (X of Y)...
   - Writing data...
   - Complete! (with link to the new invention page)
-- [ ] Create `src/hooks/useIngestJob.ts` — hook that manages job ID state, polling, and status transitions
-- [ ] Add navigation link to the ingest page from the main UI (e.g., a "+" button in the discovery panel header)
+- [x] Create `src/hooks/useIngestJob.ts` — hook that manages job ID state, polling, and status transitions
+- [x] Add navigation link to the ingest page from the main UI (e.g., a "+" button in the discovery panel header)
 
 **Files to create/modify:**
 - `src/app/ingest/page.tsx` (create)
@@ -291,10 +291,10 @@ Build the user-facing interface for uploading patents and monitoring progress.
 - `src/components/discovery/DiscoveryPanel.tsx` (modify — add ingest link)
 
 **Success criteria:**
-- [ ] User can upload a PDF via the web UI
-- [ ] Progress indicator updates in real-time as each pipeline step completes
-- [ ] On completion, user sees a link to the newly created invention
-- [ ] Error states are displayed clearly (upload failed, pipeline failed, etc.)
+- [x] User can upload a PDF via the web UI
+- [x] Progress indicator updates in real-time as each pipeline step completes
+- [x] On completion, user sees a link to the newly created invention
+- [x] Error states are displayed clearly (upload failed, pipeline failed, etc.)
 
 ---
 
@@ -304,10 +304,10 @@ Harden the pipeline and handle edge cases.
 
 **Tasks:**
 
-- [ ] Add rate limiting to `/api/ingest` — max 5 uploads per hour per IP
-- [ ] Add PDF validation: reject encrypted/password-protected PDFs, reject files > 20MB, validate content-type
-- [ ] Add path traversal prevention: sanitize invention ID to only allow `[a-z0-9-]` characters
-- [ ] Add duplicate detection: check if patent number already exists in inventions data before processing
+- [x] Add rate limiting to `/api/ingest` — max 5 uploads per hour per IP
+- [x] Add PDF validation: reject encrypted/password-protected PDFs, reject files > 20MB, validate content-type
+- [x] Add path traversal prevention: sanitize invention ID to only allow `[a-z0-9-]` characters
+- [x] Add duplicate detection: check if patent number already exists in inventions data before processing
 - [ ] Add cleanup on failure: if the pipeline fails partway, remove any partially written `.glb` files and don't append partial data to generated files
 - [ ] Add `.glb` mesh optimization: after Trellis generation, optionally compress with draco/meshopt if file size > 5MB
 - [ ] Add loading states to the viewer for `.glb` files (drei's `useGLTF` is async)
@@ -321,10 +321,10 @@ Harden the pipeline and handle edge cases.
 - `src/components/discovery/InventionCard.tsx` (modify — AI badge)
 
 **Success criteria:**
-- [ ] Invalid uploads are rejected with clear error messages
-- [ ] Duplicate patents are detected and rejected
+- [x] Invalid uploads are rejected with clear error messages
+- [x] Duplicate patents are detected and rejected
 - [ ] Pipeline failures don't leave partial data
-- [ ] The UI gracefully handles all error states
+- [x] The UI gracefully handles all error states
 
 ## Alternative Approaches Considered
 
