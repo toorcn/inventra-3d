@@ -181,9 +181,6 @@ export default function Home() {
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 z-20 rounded-xl border border-[var(--border-gold)] bg-[var(--bg-panel)] px-3 py-2 text-xs text-[var(--text-secondary)] backdrop-blur-xl">
-        {inventionState.filtered.length} inventions visible
-      </div>
     </main>
   );
 }
