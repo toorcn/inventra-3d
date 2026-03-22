@@ -6,11 +6,14 @@ import { Suspense, useMemo } from "react";
 import { InventionModel } from "./InventionModel";
 import { getModelDefinitionByInventionId } from "@/data/models";
 import { Spinner } from "@/components/ui/Spinner";
+import type { ViewerTransform } from "@/types";
 import * as THREE from "three";
 
-interface ModelViewerClientProps {
+export interface ModelViewerClientProps {
   inventionId: string;
   isExploded: boolean;
+  viewerTransform: ViewerTransform;
+  gestureTrackingActive: boolean;
   selectedComponentId: string | null;
   highlightMap?: Record<string, { color?: string; mode?: "glow" | "pulse" }>;
   beamEffect?: {
@@ -54,6 +57,8 @@ function BeamEffect({ from, to, color = "#7dd3fc", thickness = 0.03 }: BeamEffec
 export default function ModelViewerClient({
   inventionId,
   isExploded,
+  viewerTransform,
+  gestureTrackingActive,
   selectedComponentId,
   highlightMap,
   beamEffect,
@@ -61,6 +66,7 @@ export default function ModelViewerClient({
 }: ModelViewerClientProps) {
   const definition = getModelDefinitionByInventionId(inventionId);
   const cameraPos = definition?.cameraPosition ?? [0, 1.2, 5];
+  const cameraTarget = definition?.cameraTarget ?? [0, 0, 0];
   const beamData = useMemo(() => {
     if (!definition || !beamEffect) return null;
     const fromComp = definition.components.find(
@@ -96,21 +102,23 @@ export default function ModelViewerClient({
         <directionalLight position={[5, 5, 5]} intensity={0.8} />
         <Suspense fallback={null}>
           <Environment preset="city" />
-          <InventionModel
-            inventionId={inventionId}
-            isExploded={isExploded}
-            selectedComponentId={selectedComponentId}
-            highlightMap={highlightMap}
-            onComponentSelect={onComponentSelect}
-          />
-          {beamData && (
-            <BeamEffect
-              from={beamData.from}
-              to={beamData.to}
-              color={beamData.color}
-              thickness={beamData.thickness}
+          <group rotation={[viewerTransform.rotationX, viewerTransform.rotationY, 0]}>
+            <InventionModel
+              inventionId={inventionId}
+              isExploded={isExploded}
+              selectedComponentId={selectedComponentId}
+              highlightMap={highlightMap}
+              onComponentSelect={onComponentSelect}
             />
-          )}
+            {beamData && (
+              <BeamEffect
+                from={beamData.from}
+                to={beamData.to}
+                color={beamData.color}
+                thickness={beamData.thickness}
+              />
+            )}
+          </group>
           <ContactShadows position={[0, -1, 0]} opacity={0.4} scale={10} blur={2} />
         </Suspense>
         <OrbitControls
@@ -118,7 +126,8 @@ export default function ModelViewerClient({
           dampingFactor={0.05}
           minDistance={2}
           maxDistance={12}
-          autoRotate={!isExploded && !selectedComponentId}
+          target={cameraTarget}
+          autoRotate={!gestureTrackingActive && !isExploded && !selectedComponentId}
           autoRotateSpeed={0.5}
         />
       </Canvas>

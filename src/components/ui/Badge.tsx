@@ -7,6 +7,7 @@ const categoryLabelMap: Record<CategoryId, string> = {
   materials: "Materials",
   computing: "Computing",
   transportation: "Transportation",
+  other: "Other",
 };
 
 const categoryColorMap: Record<CategoryId, string> = {
@@ -16,6 +17,7 @@ const categoryColorMap: Record<CategoryId, string> = {
   materials: "#8B5CF6",
   computing: "#EC4899",
   transportation: "#EF4444",
+  other: "#9CA3AF",
 };
 
 interface BadgeProps {
@@ -26,7 +28,7 @@ interface BadgeProps {
 export function Badge({ category, className = "" }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-[var(--text-primary)] ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full border border-[var(--border-gold)] bg-white/5 px-3 py-1 text-xs font-medium text-[var(--text-primary)] ${className}`}
     >
       <span
         className="size-2 rounded-full"

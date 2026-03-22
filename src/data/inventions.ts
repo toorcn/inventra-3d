@@ -44,6 +44,20 @@ export const inventions: Invention[] = [
     hasModel: true,
   },
   {
+    id: "macintosh",
+    title: "Apple Macintosh 128K",
+    year: 1984,
+    inventors: ["Jef Raskin", "Steve Jobs", "Apple Inc."],
+    location: { lat: 37.323, lng: -122.0322 },
+    country: "United States",
+    countryCode: "US",
+    category: "computing",
+    description:
+      "The original Macintosh brought a graphical user interface, bitmap display, and mouse-driven personal computing into a compact all-in-one machine that non-specialists could use. Its approachable industrial design and desktop-publishing ecosystem helped define the modern personal computer and mainstream visual computing.",
+    patentNumber: null,
+    hasModel: true,
+  },
+  {
     id: "tesla-coil",
     title: "Tesla Coil",
     year: 1891,

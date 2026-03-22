@@ -2,17 +2,41 @@
 
 import { getInventionById } from "@/data/inventions";
 import { getComponentById } from "@/data/invention-components";
-import type { ChatMessage, ChatResponse, ExpertAction } from "@/types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ChatMessage, ChatResponse, ExpertAction, TranscriptDelivery, ViewerState } from "@/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface UseExpertProps {
   inventionId: string;
   componentId?: string | null;
+  viewerState?: ViewerState | null;
+  activeVoiceSessionId?: string | null;
   onActions?: (actions: ExpertAction[]) => void;
+}
+
+interface SendMessageOptions {
+  delivery?: TranscriptDelivery;
+}
+
+interface AppendMessageOptions {
+  role: ChatMessage["role"];
+  content: string;
+  actions?: ExpertAction[];
+  delivery?: TranscriptDelivery;
 }
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function createIntroMessage(invention: ReturnType<typeof getInventionById>): ChatMessage {
+  return {
+    id: "intro",
+    role: "assistant",
+    content: invention
+      ? `Welcome! I'm your AI guide for the **${invention.title}** (${invention.year}). ${invention.description.split(".")[0]}. Ask me anything about how it works, its history, or its components!`
+      : "Select an invention to begin exploring.",
+    timestamp: Date.now(),
+  };
 }
 
 function buildSuggestedQuestions(inventionId: string, componentId?: string | null): string[] {
@@ -39,26 +63,20 @@ function buildSuggestedQuestions(inventionId: string, componentId?: string | nul
   return base;
 }
 
-export function useExpert({ inventionId, componentId, onActions }: UseExpertProps) {
+export function useExpert({ inventionId, componentId, viewerState, activeVoiceSessionId, onActions }: UseExpertProps) {
   const invention = getInventionById(inventionId);
-  const introMessage: ChatMessage = useMemo(
-    () => ({
-      id: "intro",
-      role: "assistant",
-      content: invention
-        ? `Welcome! I'm your AI guide for the **${invention.title}** (${invention.year}). ${invention.description.split(".")[0]}. Ask me anything about how it works, its history, or its components!`
-        : "Select an invention to begin exploring.",
-      timestamp: Date.now(),
-    }),
-    [invention],
-  );
-
+  const introMessage: ChatMessage = useMemo(() => createIntroMessage(invention), [invention]);
   const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const messagesRef = useRef<ChatMessage[]>([introMessage]);
+  const messageIdsRef = useRef<Set<string>>(new Set([introMessage.id]));
 
   useEffect(() => {
-    setMessages([introMessage]);
+    const next = [introMessage];
+    messagesRef.current = next;
+    messageIdsRef.current = new Set([introMessage.id]);
+    setMessages(next);
   }, [introMessage]);
 
   const suggestedQuestions = useMemo(
@@ -66,22 +84,48 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
     [inventionId, componentId],
   );
 
-  const sendMessage = useCallback(
-    async (content: string) => {
-      console.info("[InventorNet][Expert][Client] Message queued", {
-        inventionId,
-        componentId: componentId ?? null,
-        contentPreview: content.slice(0, 120),
-      });
+  const appendServerMessages = useCallback((incomingMessages: ChatMessage[]) => {
+    const deduped = incomingMessages.filter((message) => !messageIdsRef.current.has(message.id));
 
+    if (deduped.length === 0) {
+      return messagesRef.current;
+    }
+
+    deduped.forEach((message) => {
+      messageIdsRef.current.add(message.id);
+    });
+
+    const next = [...messagesRef.current, ...deduped];
+    messagesRef.current = next;
+    setMessages(next);
+    return next;
+  }, []);
+
+  const appendMessage = useCallback(
+    (message: AppendMessageOptions) => {
+      const nextMessage: ChatMessage = {
+        id: uid(),
+        timestamp: Date.now(),
+        ...message,
+      };
+
+      appendServerMessages([nextMessage]);
+    },
+    [appendServerMessages],
+  );
+
+  const sendMessage = useCallback(
+    async (content: string, options: SendMessageOptions = {}): Promise<ChatResponse> => {
+      const delivery = options.delivery ?? "typed";
       const userMsg: ChatMessage = {
         id: uid(),
         role: "user",
         content,
+        delivery,
         timestamp: Date.now(),
       };
 
-      setMessages((prev) => [...prev, userMsg]);
+      const conversation = appendServerMessages([userMsg]);
       setIsLoading(true);
       setIsSpeaking(true);
 
@@ -93,8 +137,11 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             inventionId,
-            componentId: componentId ?? undefined,
-            messages: [...messages, userMsg],
+            componentId: componentId ?? null,
+            viewerState: viewerState ?? null,
+            messages: conversation,
+            sessionId: activeVoiceSessionId ?? undefined,
+            clientMessageId: userMsg.id,
           }),
         });
 
@@ -108,50 +155,63 @@ export function useExpert({ inventionId, componentId, onActions }: UseExpertProp
           throw new Error(payload.error);
         }
 
-        const { content: assistantContent, actions } = payload as ChatResponse;
+        const chatPayload = payload as ChatResponse;
+        const { content: assistantContent, actions } = chatPayload;
 
         const assistantMsg: ChatMessage = {
-          id: uid(),
+          id: chatPayload.assistantMessageId ?? uid(),
           role: "assistant",
           content: assistantContent,
           actions: actions.length ? actions : undefined,
+          delivery,
           timestamp: Date.now(),
         };
 
-        setMessages((prev) => [...prev, assistantMsg]);
-        console.info("[InventorNet][Expert][Client] Stage passed: assistant message appended", {
-          actionCount: actions.length,
-        });
+        appendServerMessages([assistantMsg]);
         if (actions.length) {
           console.info("[InventorNet][Expert][Client] Stage: dispatching expert actions", {
             actions,
           });
           onActions?.(actions);
         }
-        console.info("[InventorNet][Expert][Client] Chat flow complete");
-      } catch (error) {
-        console.error("[InventorNet][Expert][Client] Chat flow failed", error);
+
+        return {
+          content: assistantContent,
+          actions,
+        };
+      } catch {
         const errorMsg: ChatMessage = {
           id: uid(),
           role: "assistant",
           content: "Sorry, I encountered an error. Please try asking again.",
+          delivery,
           timestamp: Date.now(),
         };
-        setMessages((prev) => [...prev, errorMsg]);
+        appendServerMessages([errorMsg]);
+
+        return {
+          content: "Sorry, I encountered an error. Please try asking again.",
+          actions: [],
+        };
       } finally {
         setIsLoading(false);
         setIsSpeaking(false);
         console.info("[InventorNet][Expert][Client] Chat loading cleared");
       }
     },
-    [inventionId, componentId, messages, onActions],
+    [activeVoiceSessionId, appendServerMessages, componentId, inventionId, onActions],
   );
 
   const clearMessages = useCallback(() => {
-    setMessages([introMessage]);
+    const next = [introMessage];
+    messagesRef.current = next;
+    messageIdsRef.current = new Set([introMessage.id]);
+    setMessages(next);
   }, [introMessage]);
 
   return {
+    appendMessage,
+    appendServerMessages,
     messages,
     isLoading,
     isSpeaking,

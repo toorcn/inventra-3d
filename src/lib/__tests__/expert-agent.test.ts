@@ -31,12 +31,78 @@ describe("executeToolCalls", () => {
         color: undefined,
       },
       {
+        type: "select",
+        componentId: "tesla-top-load",
+        durationMs: 1800,
+      },
+      {
         type: "beam",
         fromComponentId: "tesla-spark-gap",
         toComponentId: "tesla-top-load",
         durationMs: undefined,
         color: "#7dd3fc",
         thickness: undefined,
+      },
+    ]);
+  });
+
+  it("preserves an explicit select without adding a duplicate derived select", () => {
+    const actions = executeToolCalls("tesla-coil", [
+      {
+        name: "highlight_components",
+        arguments: {
+          componentIds: ["tesla-top-load"],
+          durationMs: 1800,
+        },
+      },
+      {
+        name: "select_component",
+        arguments: {
+          componentId: "tesla-top-load",
+          durationMs: 2200,
+        },
+      },
+    ]);
+
+    expect(actions).toEqual([
+      {
+        type: "highlight",
+        componentIds: ["tesla-top-load"],
+        mode: undefined,
+        durationMs: 1800,
+        color: undefined,
+      },
+      {
+        type: "select",
+        componentId: "tesla-top-load",
+        durationMs: 1800,
+      },
+      {
+        type: "select",
+        componentId: "tesla-top-load",
+        durationMs: 2200,
+      },
+    ]);
+  });
+
+  it("does not derive a select for multi-component highlights", () => {
+    const actions = executeToolCalls("tesla-coil", [
+      {
+        name: "highlight_components",
+        arguments: {
+          componentIds: ["tesla-top-load", "tesla-spark-gap"],
+          durationMs: 1800,
+        },
+      },
+    ]);
+
+    expect(actions).toEqual([
+      {
+        type: "highlight",
+        componentIds: ["tesla-top-load", "tesla-spark-gap"],
+        mode: undefined,
+        durationMs: 1800,
+        color: undefined,
       },
     ]);
   });

@@ -23,33 +23,21 @@ export function SidePanel({
   inventions,
   activeCategories,
   onToggleCategory,
-  selectedInvention,
   onSelectInvention,
   searchValue,
   onSearchChange,
   onSearchSubmit,
   isSearching,
-}: SidePanelProps) {
-  if (selectedInvention) {
-    return (
-      <aside className="pointer-events-auto flex h-full w-96 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-panel)] backdrop-blur-xl">
-        <InventionDetail
-          invention={selectedInvention}
-          onBack={() => onSelectInvention(null)}
-        />
-      </aside>
-    );
-  }
-
+}: Omit<SidePanelProps, "selectedInvention">) {
   return (
-    <aside className="pointer-events-auto flex h-full w-96 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--bg-panel)] backdrop-blur-xl">
-      <div className="border-b border-white/5 p-4">
+    <aside className="pointer-events-auto flex h-full w-[300px] flex-col overflow-hidden rounded-2xl border border-[var(--border-gold)] bg-[var(--bg-panel)] backdrop-blur-xl">
+      <div className="border-b border-[var(--border-gold)] p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Globe2 className="size-5 text-cyan-400" />
-            <h2 className="text-lg font-semibold text-white">Inventions</h2>
+            <Globe2 className="size-5 text-[var(--accent-gold)]" />
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Inventions</h2>
           </div>
-          <span className="rounded-full bg-blue-500/20 px-2.5 py-0.5 text-xs font-medium text-blue-300">
+          <span className="rounded-full bg-[var(--accent-gold)]/15 px-2.5 py-0.5 text-xs font-medium text-[var(--accent-gold-light)]">
             {inventions.length}
           </span>
         </div>
@@ -67,7 +55,7 @@ export function SidePanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-2">
         <div className="flex flex-col gap-2">
           {inventions.map((inv) => (
             <InventionCard

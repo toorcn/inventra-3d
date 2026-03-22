@@ -1,5 +1,5 @@
 import { getComponentsByInventionId } from "@/data/invention-components";
-import type { Invention, InventionComponent } from "@/types";
+import type { Invention, InventionComponent, ViewerState } from "@/types";
 import type { ExpertAction } from "@/types";
 import { chatCompletion, hasOpenRouterApiKey, structuredOutput, type OpenRouterMessage } from "./openrouter";
 
@@ -56,7 +56,7 @@ export interface ExpertAgentResult {
   actions: ExpertAction[];
 }
 
-function buildToolInstructions(invention: Invention, component?: InventionComponent): string {
+export function buildToolInstructions(invention: Invention, component?: InventionComponent, viewerState?: ViewerState): string {
   const components = getComponentsByInventionId(invention.id);
   const lines = [
     `You are an expert historian and engineer explaining the ${invention.title}.`,
@@ -94,6 +94,18 @@ function buildToolInstructions(invention: Invention, component?: InventionCompon
     lines.push("Tool: emit_beam { fromComponentId, toComponentId, durationMs?, color?, thickness? }");
   } else {
     lines.push("No viewer tools are available for this invention because there is no 3D model.");
+  }
+
+  if (viewerState) {
+    const stateParts: string[] = [];
+    stateParts.push(viewerState.isExploded ? "model is exploded" : "model is assembled");
+    if (viewerState.highlightedComponentIds.length > 0) {
+      const names = viewerState.highlightedComponentIds
+        .map((id) => components.find((c) => c.id === id)?.name ?? id)
+        .join(", ");
+      stateParts.push(`highlighted: ${names}`);
+    }
+    lines.push(`Current viewer state: ${stateParts.join(", ")}`);
   }
 
   return lines.join("\n");
@@ -159,6 +171,7 @@ function toStructuredToolCall(raw: AgentModelResponse["toolCalls"][number]): Too
 export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): ExpertAction[] {
   const componentIds = new Set(getComponentsByInventionId(inventionId).map((item) => item.id));
   const actions: ExpertAction[] = [];
+  const selectedComponentIds = new Set<string>();
 
   for (const toolCall of toolCalls) {
     if (toolCall.name === "highlight_components") {
@@ -171,6 +184,17 @@ export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): Ex
           color: toolCall.arguments.color,
           mode: toolCall.arguments.mode,
         });
+
+        // Keep the mini explainer card aligned with single-component highlights
+        // even when the model omits an explicit select tool call.
+        if (validIds.length === 1 && !selectedComponentIds.has(validIds[0])) {
+          actions.push({
+            type: "select",
+            componentId: validIds[0],
+            durationMs: toolCall.arguments.durationMs,
+          });
+          selectedComponentIds.add(validIds[0]);
+        }
       }
       continue;
     }
@@ -182,6 +206,7 @@ export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): Ex
           componentId: toolCall.arguments.componentId,
           durationMs: toolCall.arguments.durationMs,
         });
+        selectedComponentIds.add(toolCall.arguments.componentId);
       }
       continue;
     }
@@ -219,12 +244,21 @@ export function executeToolCalls(inventionId: string, toolCalls: ToolCall[]): Ex
   return actions;
 }
 
+const TOOL_NAMES_PATTERN = "highlight_components|select_component|explode_model|assemble_model|reset_viewer|emit_beam";
+
+function stripEmbeddedToolSyntax(text: string): string {
+  // Remove patterns like {highlight_components componentIds=["x"] ...} that the LLM
+  // sometimes embeds in prose despite being told not to.
+  return text.replace(new RegExp(`\\{(?:${TOOL_NAMES_PATTERN})[^}]*\\}`, "g"), "").replace(/  +/g, " ").trim();
+}
+
 export async function runExpertAgent(
   invention: Invention,
   messages: OpenRouterMessage[],
   component?: InventionComponent,
+  viewerState?: ViewerState,
 ): Promise<ExpertAgentResult> {
-  const systemPrompt = buildToolInstructions(invention, component);
+  const systemPrompt = buildToolInstructions(invention, component, viewerState);
 
   console.info("[InventorNet][Expert][Server] Agent started", {
     inventionId: invention.id,
@@ -285,10 +319,10 @@ export async function runExpertAgent(
         content: `${systemPrompt}
 
 Return JSON with:
-- reply: the visible answer to the user
+- reply: the visible answer to the user (plain prose only — no component IDs, no bracket references, no tool syntax)
 - toolCalls: an array of zero or more tool calls
 
-Do not include any tool syntax in reply.`,
+Do not embed component IDs or any tool syntax inside reply. Use toolCalls to trigger viewer actions instead.`,
       },
       ...messages,
     ],
@@ -311,7 +345,7 @@ Do not include any tool syntax in reply.`,
     actionCount: actions.length,
   });
   return {
-    content: parsed.reply,
-    actions,
+    content: stripEmbeddedToolSyntax(parsed.reply),
+    actions: executeToolCalls(invention.id, toolCalls),
   };
 }

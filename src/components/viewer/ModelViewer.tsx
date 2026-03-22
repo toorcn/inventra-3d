@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { ViewerLoader } from "@/components/ui/ViewerLoader";
+import type { ViewerTransform } from "@/types";
 
 const ModelViewerClient = dynamic(() => import("./ModelViewerClient"), {
   ssr: false,
@@ -11,6 +12,8 @@ const ModelViewerClient = dynamic(() => import("./ModelViewerClient"), {
 interface ModelViewerProps {
   inventionId: string;
   isExploded: boolean;
+  viewerTransform: ViewerTransform;
+  gestureTrackingActive: boolean;
   selectedComponentId: string | null;
   highlightMap?: Record<string, { color?: string; mode?: "glow" | "pulse" }>;
   beamEffect?: {

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#141e38"/>
+      <stop offset="100%" stop-color="#0a0b14"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d4af55" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#d4af55" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <ellipse cx="200" cy="150" rx="150" ry="110" fill="url(#glow)"/>
+
+  <!-- PCB grid lines (very subtle) -->
+  <g stroke="rgba(212,175,85,0.07)" stroke-width="1">
+    <line x1="0" y1="50" x2="400" y2="50"/>
+    <line x1="0" y1="100" x2="400" y2="100"/>
+    <line x1="0" y1="200" x2="400" y2="200"/>
+    <line x1="0" y1="250" x2="400" y2="250"/>
+    <line x1="50" y1="0" x2="50" y2="300"/>
+    <line x1="100" y1="0" x2="100" y2="300"/>
+    <line x1="300" y1="0" x2="300" y2="300"/>
+    <line x1="350" y1="0" x2="350" y2="300"/>
+  </g>
+
+  <!-- Chip package body -->
+  <rect x="155" y="105" width="90" height="90" rx="6" fill="rgba(15,20,40,0.95)" stroke="#d4af55" stroke-width="2" stroke-opacity="0.8"/>
+  <!-- Chip notch -->
+  <path d="M 195 105 Q 200 100, 205 105" fill="none" stroke="#d4af55" stroke-width="1.5" stroke-opacity="0.7"/>
+  <!-- Chip inner die -->
+  <rect x="168" y="118" width="64" height="64" rx="3" fill="rgba(212,175,85,0.06)" stroke="rgba(212,175,85,0.3)" stroke-width="1"/>
+
+  <!-- NPN transistor symbol inside chip -->
+  <!-- Vertical base line -->
+  <line x1="192" y1="135" x2="192" y2="165" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.9"/>
+  <!-- Collector line (top-right diagonal) -->
+  <line x1="192" y1="142" x2="214" y2="128" stroke="#d4af55" stroke-width="2" stroke-opacity="0.9"/>
+  <!-- Emitter line (bottom-right diagonal) with arrow -->
+  <line x1="192" y1="158" x2="214" y2="172" stroke="#d4af55" stroke-width="2" stroke-opacity="0.9"/>
+  <!-- Emitter arrow -->
+  <polygon points="214,172 205,165 208,174" fill="#d4af55" opacity="0.9"/>
+  <!-- Base horizontal line -->
+  <line x1="178" y1="150" x2="192" y2="150" stroke="#d4af55" stroke-width="2" stroke-opacity="0.9"/>
+
+  <!-- Collector trace up to top pin -->
+  <line x1="214" y1="128" x2="214" y2="105" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+  <!-- Emitter trace down to bottom pin -->
+  <line x1="214" y1="172" x2="214" y2="195" stroke="#d4af55" stroke-width="2" stroke-opacity="0.7"/>
+
+  <!-- Circuit traces on PCB -->
+  <!-- Base trace (left) -->
+  <path d="M 155 150 L 90 150 L 90 150" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.7" fill="none"/>
+  <!-- Via dot at bend -->
+  <circle cx="90" cy="150" r="4" fill="#d4af55" opacity="0.7"/>
+  <path d="M 90 150 L 40 150" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.5" fill="none"/>
+
+  <!-- Collector trace (top) -->
+  <path d="M 200 105 L 200 70 L 260 70 L 340 70" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.7" fill="none"/>
+  <circle cx="260" cy="70" r="4" fill="#d4af55" opacity="0.7"/>
+
+  <!-- Emitter trace (bottom) -->
+  <path d="M 200 195 L 200 230 L 260 230 L 340 230" stroke="#d4af55" stroke-width="2.5" stroke-opacity="0.7" fill="none"/>
+  <circle cx="260" cy="230" r="4" fill="#d4af55" opacity="0.7"/>
+
+  <!-- Resistor on base trace -->
+  <rect x="100" y="143" width="30" height="14" rx="2" fill="rgba(15,20,40,0.9)" stroke="#f5f0e1" stroke-width="1.5" stroke-opacity="0.7"/>
+
+  <!-- Pin pads -->
+  <rect x="25" y="143" width="15" height="14" rx="2" fill="rgba(212,175,85,0.15)" stroke="#d4af55" stroke-width="1.5"/>
+  <rect x="340" y="63" width="20" height="14" rx="2" fill="rgba(212,175,85,0.15)" stroke="#d4af55" stroke-width="1.5"/>
+  <rect x="340" y="223" width="20" height="14" rx="2" fill="rgba(212,175,85,0.15)" stroke="#d4af55" stroke-width="1.5"/>
+
+  <!-- Labels -->
+  <text x="22" y="139" font-family="monospace" font-size="9" fill="#f5f0e1" opacity="0.7">BASE</text>
+  <text x="345" y="59" font-family="monospace" font-size="9" fill="#f5f0e1" opacity="0.7">C</text>
+  <text x="345" y="219" font-family="monospace" font-size="9" fill="#f5f0e1" opacity="0.7">E</text>
+
+  <!-- NPN label -->
+  <text x="200" y="160" text-anchor="middle" font-family="monospace" font-size="8" fill="#d4af55" opacity="0.6">NPN</text>
+
+  <!-- Bottom label -->
+  <text x="200" y="278" text-anchor="middle" font-family="monospace" font-size="12" fill="#d4af55" opacity="0.85" letter-spacing="2">TRANSISTOR</text>
+  <line x1="100" y1="268" x2="300" y2="268" stroke="rgba(212,175,85,0.3)" stroke-width="1"/>
+</svg>

@@ -19,10 +19,10 @@ const sizeClasses: Record<ButtonSize, string> = {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-[var(--glow-blue)] hover:brightness-110",
+    "bg-gradient-to-r from-[#b8932e] to-[#d4af55] text-white shadow-[var(--glow-gold)] hover:brightness-110",
   secondary:
-    "bg-white/10 border border-white/15 text-[var(--text-primary)] hover:bg-white/20",
-  ghost: "bg-transparent border border-white/10 text-[var(--text-secondary)] hover:text-white hover:bg-white/10",
+    "bg-white/10 border border-[var(--border-gold)] text-[var(--text-primary)] hover:bg-white/20",
+  ghost: "bg-transparent border border-white/10 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10",
 };
 
 function Spinner() {

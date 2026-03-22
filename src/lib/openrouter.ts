@@ -21,7 +21,7 @@ function getHeaders(): HeadersInit {
     "Content-Type": "application/json",
     Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
     "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-    "X-Title": "InventorNet",
+    "X-Title": "Inventra",
   };
 }
 
@@ -89,7 +89,7 @@ export async function structuredOutput<T>(
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "inventornet_schema",
+          name: "inventra_schema",
           strict: true,
           schema,
         },

@@ -14,15 +14,15 @@ export function InventionCard({ invention, isSelected, onClick }: InventionCardP
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left transition-all ${
+      className={`w-full rounded-xl border p-2 text-left transition-all ${
         isSelected
-          ? "border-blue-400/50 bg-blue-500/10 shadow-[var(--glow-blue)]"
-          : "border-white/5 bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.06]"
+          ? "border-[var(--accent-gold)]/50 bg-[var(--accent-gold)]/10 shadow-[var(--glow-gold)]"
+          : "border-white/5 bg-white/[0.03] hover:border-[var(--border-gold)] hover:bg-white/[0.06]"
       }`}
     >
       <div className="mb-1 flex items-center gap-2">
-        <span className="truncate text-sm font-medium text-white">{invention.title}</span>
-        {invention.hasModel && <Box className="size-3.5 shrink-0 text-cyan-400" />}
+        <span className="truncate text-sm font-medium text-[var(--text-primary)]">{invention.title}</span>
+        {invention.hasModel && <Box className="size-3.5 shrink-0 text-[var(--accent-gold)]" />}
       </div>
       <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
         <span>{invention.year}</span>

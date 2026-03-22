@@ -1,6 +1,6 @@
-# InventorNet
+# Inventra
 
-InventorNet is a Next.js app for exploring breakthrough inventions around the world through an interactive 3D globe, rich invention briefs, an interactive 3D “exploded view” for select inventions, and an AI “expert” chat panel for contextual explanations.
+Inventra is a Next.js app for exploring breakthrough inventions around the world through an interactive 3D globe, rich invention briefs, an interactive 3D “exploded view” for select inventions, and an AI “expert” chat panel for contextual explanations.
 
 ## What you can do
 
@@ -9,7 +9,9 @@ InventorNet is a Next.js app for exploring breakthrough inventions around the wo
 - **Search in plain language** (e.g. “renewable energy in Europe”, “after 1950 in the US”).
 - **Open an invention detail page** with a story/brief.
 - **Explore select inventions in 3D** with component picking and an exploded view.
+- **Control supported 3D models with webcam gestures** for rotation, explode, and assemble.
 - **Ask the AI Expert** questions about the invention or a selected component.
+- **Connect a live voice session** powered by Agora, ask spoken follow-ups in real time, and keep typed and spoken turns in one shared transcript.
 
 > Note: without an API key, chat/search fall back to offline heuristics and a baseline response.
 
@@ -28,6 +30,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Gesture controls
+
+Gesture controls are available on invention detail pages for entries that have a 3D model.
+
+- Click `Enable Gestures` in the viewer toolbar.
+- Allow webcam access when prompted.
+- Show one hand to the camera.
+- `Open_Palm`: rotate the model by moving your hand left/right/up/down in the camera view.
+- `Thumb_Up`: explode the model.
+- `Thumb_Down`: assemble the model.
+
+Implementation notes:
+
+- Gesture recognition runs locally in the browser with MediaPipe Tasks Vision.
+- Rotation uses palm-center movement, not wrist twist.
+- The viewer keeps `Open_Palm` tracking alive through short recognition dropouts to reduce stop/restart behavior.
+- The webcam preview includes a debug overlay with the detected hand bounds, palm center, gesture label, confidence, and tracking state (`Stable`, `Grace`, `Searching`).
+- Standard mouse/touch orbit controls remain available in the 3D viewer alongside webcam gestures.
+
 ## Configuration (optional)
 
 Create `.env.local` in the project root:
@@ -44,6 +65,19 @@ BLOB_READ_WRITE_TOKEN=...
 
 # Used for OpenRouter headers (optional).
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Agora live voice session configuration.
+NEXT_PUBLIC_AGORA_APP_ID=...
+AGORA_APP_CERTIFICATE=...
+AGORA_CUSTOMER_ID=...
+AGORA_CUSTOMER_SECRET=...
+
+# Agora CAE uses ElevenLabs for spoken replies.
+ELEVENLABS_API_KEY=...
+ELEVENLABS_VOICE_ID=...
+
+# Optional override for the spoken voice model.
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 ```
 
 ## Scripts
@@ -77,6 +111,8 @@ npm run test:watch # vitest in watch mode
 - `src/app/api/patent/components/review/route.ts`: component triage persistence endpoint
 - `src/app/api/patent/components/generate/route.ts`: variant-aware component image generation endpoint
 - `src/app/api/patent/three-d/generate/route.ts`: featured hero + subassembly Trellis 2 generation endpoint
+- `src/app/api/chat/route.ts`: shared expert chat endpoint for typed turns
+- `src/app/api/voice/*`: Agora live session, agent lifecycle, and custom LLM webhook endpoints
 - `src/data/*`: invention dataset, categories, 3D component definitions
 
 ## Patent PDF Extraction (POC)
@@ -154,6 +190,7 @@ curl -X POST http://localhost:3000/api/patent/extract \
 
 - The globe loads its country geojson and textures from public GitHub URLs at runtime (`src/components/globe/GlobeClient.tsx`).
 - The “3D models” in this repo are procedural primitives (no `.glb` assets in `public/` by default).
+- Live voice controls automatically disable themselves when the Agora voice env vars are not configured; typed chat still works.
 
 ## Deploy
 
