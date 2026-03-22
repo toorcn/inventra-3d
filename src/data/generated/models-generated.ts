@@ -100,5 +100,125 @@ export const generatedModelDefinitions: ModelDefinition[] = [
       0,
       0
     ]
+  },
+  {
+    "inventionId": "517-900",
+    "components": [
+      {
+        "componentId": "517-900-engine-body",
+        "geometry": {
+          "type": "glb",
+          "args": [],
+          "glbUrl": "models/517-900/engine-body.glb"
+        },
+        "assembledPosition": [
+          0,
+          0,
+          0
+        ],
+        "explodedPosition": [
+          2.5,
+          0,
+          0
+        ],
+        "color": "#778899",
+        "metalness": 0.35,
+        "roughness": 0.45
+      },
+      {
+        "componentId": "517-900-piston",
+        "geometry": {
+          "type": "glb",
+          "args": [],
+          "glbUrl": "models/517-900/piston.glb"
+        },
+        "assembledPosition": [
+          0,
+          0,
+          0
+        ],
+        "explodedPosition": [
+          0.7725424859373686,
+          0,
+          2.3776412907378837
+        ],
+        "color": "#C0C0C0",
+        "metalness": 0.35,
+        "roughness": 0.45
+      },
+      {
+        "componentId": "517-900-slide-valve",
+        "geometry": {
+          "type": "glb",
+          "args": [],
+          "glbUrl": "models/517-900/slide-valve.glb"
+        },
+        "assembledPosition": [
+          0,
+          0.5,
+          0
+        ],
+        "explodedPosition": [
+          -0.40450849718747367,
+          2.5,
+          0.2938926261462366
+        ],
+        "color": "#808080",
+        "metalness": 0.35,
+        "roughness": 0.45
+      },
+      {
+        "componentId": "517-900-steam-ducts",
+        "geometry": {
+          "type": "glb",
+          "args": [],
+          "glbUrl": "models/517-900/steam-ducts.glb"
+        },
+        "assembledPosition": [
+          0,
+          -0.5,
+          0
+        ],
+        "explodedPosition": [
+          -0.4045084971874737,
+          -2.5,
+          -0.2938926261462365
+        ],
+        "color": "#A9A9A9",
+        "metalness": 0.35,
+        "roughness": 0.45
+      },
+      {
+        "componentId": "517-900-exhaust-chamber",
+        "geometry": {
+          "type": "glb",
+          "args": [],
+          "glbUrl": "models/517-900/exhaust-chamber.glb"
+        },
+        "assembledPosition": [
+          0,
+          -0.5,
+          0
+        ],
+        "explodedPosition": [
+          0.15450849718747361,
+          -2.5,
+          -0.4755282581475768
+        ],
+        "color": "#696969",
+        "metalness": 0.35,
+        "roughness": 0.45
+      }
+    ],
+    "cameraPosition": [
+      0,
+      1.5,
+      5
+    ],
+    "cameraTarget": [
+      0,
+      0,
+      0
+    ]
   }
 ];

@@ -22,5 +22,23 @@ export const generatedInventions: Invention[] = [
     "description": "The ballpoint pen includes a zirconia sintered body writing ball with low aluminum content and ink containing inorganic particles. This design reduces wear on the ball receiving seat, maintaining good writing condition for a longer period. The pen aims to solve the problem of wear caused by alumina content in conventional zirconia writing balls when used with ink containing inorganic particles.",
     "patentNumber": "9,533,528 B2",
     "hasModel": true
+  },
+  {
+    "id": "517-900",
+    "title": "Steam Engine",
+    "year": 1894,
+    "inventors": [
+      "Nikola Tesla"
+    ],
+    "location": {
+      "lat": 40.7128,
+      "lng": -74.006
+    },
+    "country": "United States",
+    "countryCode": "US",
+    "category": "energy",
+    "description": "The steam engine uses the energy of steam or gas under pressure, acting through proper mechanism, to maintain in oscillation a piston, and connect with or cause to act upon such piston a spring, preferably, an air spring, under such conditions as to automatically regulate the period of the vibration. This engine is designed to control the admission and exhaust of steam or gas under pressure in other engines, especially those without a flywheel.",
+    "patentNumber": "517,900",
+    "hasModel": true
   }
 ];

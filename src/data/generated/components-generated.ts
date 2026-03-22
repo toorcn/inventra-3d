@@ -109,5 +109,135 @@ export const generatedComponents: InventionComponent[] = [
       -0.5
     ],
     "color": "#A9A9A9"
+  },
+  {
+    "id": "517-900-engine-body",
+    "inventionId": "517-900",
+    "name": "Engine Body",
+    "description": "The main body of the steam engine, a large, cast metal structure with cylindrical chambers and ports for steam intake and exhaust. It has a complex internal geometry with passages for the piston and slide valve.",
+    "materials": [
+      "Cast Iron"
+    ],
+    "patentText": "A designates a cylinder containing a reciprocating piston B secured to a rod C extending through or both cylinders.",
+    "geometry": {
+      "type": "glb",
+      "args": [],
+      "glbUrl": "models/517-900/engine-body.glb"
+    },
+    "assembledPosition": [
+      0,
+      0,
+      0
+    ],
+    "explodedPosition": [
+      2.5,
+      0,
+      0
+    ],
+    "color": "#778899"
+  },
+  {
+    "id": "517-900-piston",
+    "inventionId": "517-900",
+    "name": "Piston",
+    "description": "A cylindrical piston that reciprocates within the engine cylinder. It has a smooth surface to create a tight seal against the cylinder walls. The piston is connected to a piston rod.",
+    "materials": [
+      "Steel"
+    ],
+    "patentText": "B secured to a rod C extending through or both cylinders.",
+    "geometry": {
+      "type": "glb",
+      "args": [],
+      "glbUrl": "models/517-900/piston.glb"
+    },
+    "assembledPosition": [
+      0,
+      0,
+      0
+    ],
+    "explodedPosition": [
+      0.7725424859373686,
+      0,
+      2.3776412907378837
+    ],
+    "color": "#C0C0C0"
+  },
+  {
+    "id": "517-900-slide-valve",
+    "inventionId": "517-900",
+    "name": "Slide Valve",
+    "description": "A cylindrical slide valve that controls the admission and exhaust of steam to the engine cylinder. It has a complex internal geometry with ports and passages to direct the steam flow.",
+    "materials": [
+      "Steel"
+    ],
+    "patentText": "G designates a slide valve which when reciprocated admits steam from the gas through the ducts D to the ends of the cylinder.",
+    "geometry": {
+      "type": "glb",
+      "args": [],
+      "glbUrl": "models/517-900/slide-valve.glb"
+    },
+    "assembledPosition": [
+      0,
+      0.5,
+      0
+    ],
+    "explodedPosition": [
+      -0.40450849718747367,
+      2.5,
+      0.2938926261462366
+    ],
+    "color": "#808080"
+  },
+  {
+    "id": "517-900-steam-ducts",
+    "inventionId": "517-900",
+    "name": "Steam Ducts",
+    "description": "The steam ducts are passages that conduct steam to and from the engine cylinder. They are typically made of metal and are designed to withstand high pressures and temperatures.",
+    "materials": [
+      "Steel"
+    ],
+    "patentText": "D are steam ducts communicating with the cylinder at or near its ends and E is the exhaust chamber or passage located between the steam ports.",
+    "geometry": {
+      "type": "glb",
+      "args": [],
+      "glbUrl": "models/517-900/steam-ducts.glb"
+    },
+    "assembledPosition": [
+      0,
+      -0.5,
+      0
+    ],
+    "explodedPosition": [
+      -0.4045084971874737,
+      -2.5,
+      -0.2938926261462365
+    ],
+    "color": "#A9A9A9"
+  },
+  {
+    "id": "517-900-exhaust-chamber",
+    "inventionId": "517-900",
+    "name": "Exhaust Chamber",
+    "description": "The exhaust chamber is a space where the exhaust steam from the engine is collected. It is typically located near the bottom of the engine and is connected to an exhaust pipe.",
+    "materials": [
+      "Cast Iron"
+    ],
+    "patentText": "E is the exhaust chamber or passage located between the steam ports.",
+    "geometry": {
+      "type": "glb",
+      "args": [],
+      "glbUrl": "models/517-900/exhaust-chamber.glb"
+    },
+    "assembledPosition": [
+      0,
+      -0.5,
+      0
+    ],
+    "explodedPosition": [
+      0.15450849718747361,
+      -2.5,
+      -0.4755282581475768
+    ],
+    "color": "#696969"
   }
 ];
