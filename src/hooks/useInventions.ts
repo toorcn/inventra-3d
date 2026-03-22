@@ -9,6 +9,7 @@ export function useInventions(): UseInventionsReturn {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInventionId, setSelectedInventionId] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [yearRange, setYearRange] = useState<[number, number]>([-3500, 2024]);
 
   const filtered = useMemo(() => {
     let result = allInventions;
@@ -21,8 +22,10 @@ export function useInventions(): UseInventionsReturn {
       result = result.filter((inv) => inv.countryCode === selectedCountry);
     }
 
+    result = result.filter((inv) => inv.year >= yearRange[0] && inv.year <= yearRange[1]);
+
     return result;
-  }, [activeCategories, selectedCountry]);
+  }, [activeCategories, selectedCountry, yearRange]);
 
   const toggleCategory = useCallback((id: CategoryId) => {
     setActiveCategories((prev) =>
@@ -43,6 +46,7 @@ export function useInventions(): UseInventionsReturn {
     setSearchQuery("");
     setSelectedInventionId(null);
     setSelectedCountry(null);
+    setYearRange([-3500, 2024]);
   }, []);
 
   const selectedInvention = useMemo<Invention | null>(
@@ -61,6 +65,8 @@ export function useInventions(): UseInventionsReturn {
     selectInvention,
     selectedCountry,
     selectCountry,
+    yearRange,
+    setYearRange,
     resetFilters,
   };
 }

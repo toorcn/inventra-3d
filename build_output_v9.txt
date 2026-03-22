@@ -1,0 +1,39 @@
+
+> inventra@0.1.0 build
+> next build
+
+SyntaxError: Expected ',' or '}' after property value in JSON at position 46277 (line 1438 column 5)
+    at JSON.parse (<anonymous>)
+   Γû▓ Next.js 15.5.14
+
+   Creating an optimized production build ...
+SyntaxError: Expected ',' or '}' after property value in JSON at position 46277 (line 1438 column 5)
+    at JSON.parse (<anonymous>)
+Failed to compile.
+
+./src/lib/patent-extractor.ts
+Module not found: Can't resolve '@napi-rs/canvas'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/app/api/patent/extract/route.ts
+
+./src/lib/patent-extractor.ts
+Module not found: Can't resolve 'pdfjs-dist/legacy/build/pdf.mjs'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/app/api/patent/extract/route.ts
+
+./src/lib/patent-workspace-store.ts
+Module not found: Can't resolve '@vercel/blob'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/app/api/patent/workspace/route.ts
+
+
+> Build failed because of webpack errors
