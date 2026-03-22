@@ -11,6 +11,7 @@ export interface WriteOutputPayload {
   figures: FigureInfo[];
   meshes: MeshResult[];
   positions: ComponentPosition[];
+  projectRoot: string;
 }
 
 export interface WriteOutputResult {
@@ -18,14 +19,14 @@ export interface WriteOutputResult {
   glbPaths: string[];
 }
 
-// Project root (relative to trigger/ directory at runtime)
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
+// PROJECT_ROOT is passed via payload since __dirname points to Trigger.dev's build output dir
 
 export const writeOutputTask = task({
   id: "write-output",
   retry: { maxAttempts: 1 },
   run: async (payload: WriteOutputPayload): Promise<WriteOutputResult> => {
-    const { patentAnalysis, figures, meshes, positions } = payload;
+    const { patentAnalysis, figures, meshes, positions, projectRoot } = payload;
+    const PROJECT_ROOT = projectRoot;
     const inventionId = patentAnalysis.id;
 
     logger.info("Writing output", { inventionId, meshCount: meshes.length });

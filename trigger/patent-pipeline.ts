@@ -11,6 +11,7 @@ import { inventions } from "../src/data/inventions";
 export interface PatentPipelinePayload {
   pdfPath: string;
   jobId: string;
+  projectRoot: string;
 }
 
 export interface PatentPipelineOutput {
@@ -83,6 +84,7 @@ export const patentPipelineTask = task({
         figures: figureAnalysis.figures,
         meshes: meshes.meshes,
         positions: positions.components,
+        projectRoot: payload.projectRoot,
       })
       .unwrap();
 

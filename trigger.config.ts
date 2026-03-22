@@ -1,7 +1,7 @@
 import { defineConfig } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
-  project: "inventra",
+  project: "proj_woortadeycwscnlmlbcy",
   maxDuration: 600, // 10 minutes max per task
   dirs: ["./trigger"],
   retries: {

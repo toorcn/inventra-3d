@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     const handle = await tasks.trigger<typeof patentPipelineTask>("patent-pipeline", {
       pdfPath,
       jobId,
+      projectRoot: process.cwd(),
     });
 
     return NextResponse.json({

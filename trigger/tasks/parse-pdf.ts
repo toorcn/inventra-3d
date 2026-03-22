@@ -27,7 +27,20 @@ export const parsePdfTask = task({
 
     // Use pdfjs-dist for text extraction and page rendering
     const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+
+    // Configure standard font data URL to suppress warnings
+    const path = await import("node:path");
+    const standardFontDataUrl = path.join(
+      path.dirname(require.resolve("pdfjs-dist/package.json")),
+      "standard_fonts/"
+    );
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      standardFontDataUrl,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
     const pdfDocument = await loadingTask.promise;
 
     logger.info("PDF loaded", { totalPages: pdfDocument.numPages });
