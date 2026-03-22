@@ -1,6 +1,13 @@
+type OpenRouterTextContent = { type: "text"; text: string };
+type OpenRouterImageContent = {
+  type: "image_url";
+  image_url: { url: string };
+};
+type OpenRouterContentPart = OpenRouterTextContent | OpenRouterImageContent;
+
 type OpenRouterMessage = {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | OpenRouterContentPart[];
 };
 
 type CompletionOptions = {
@@ -131,5 +138,20 @@ export async function chatCompletionStream(
   return response.body;
 }
 
-export type { OpenRouterMessage };
+/** Build a multimodal user message with text and base64 images */
+export function multimodalMessage(
+  text: string,
+  images: { base64: string; mimeType?: string }[],
+): OpenRouterMessage {
+  const content: OpenRouterContentPart[] = [
+    { type: "text", text },
+    ...images.map((img) => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${img.mimeType ?? "image/png"};base64,${img.base64}` },
+    })),
+  ];
+  return { role: "user", content };
+}
+
+export type { OpenRouterMessage, OpenRouterContentPart };
 export const hasOpenRouterApiKey = hasApiKey;

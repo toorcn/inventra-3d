@@ -1,6 +1,7 @@
 import type { InventionComponent } from "@/types";
+import { generatedComponents } from "./generated/components-generated";
 
-export const inventionComponents: InventionComponent[] = [
+const staticComponents: InventionComponent[] = [
   {
     id: "iphone-body",
     inventionId: "iphone",
@@ -436,6 +437,8 @@ export const inventionComponents: InventionComponent[] = [
     color: "#3b82f6",
   },
 ];
+
+export const inventionComponents: InventionComponent[] = [...staticComponents, ...generatedComponents];
 
 export function getComponentsByInventionId(inventionId: string): InventionComponent[] {
   return inventionComponents.filter((component) => component.inventionId === inventionId);

@@ -1,6 +1,7 @@
 import type { CategoryId, Invention } from "@/types";
+import { generatedInventions } from "./generated/inventions-generated";
 
-export const inventions: Invention[] = [
+const staticInventions: Invention[] = [
   {
     id: "light-bulb",
     title: "Incandescent Light Bulb",
@@ -366,6 +367,8 @@ export const inventions: Invention[] = [
     hasModel: false,
   },
 ];
+
+export const inventions: Invention[] = [...staticInventions, ...generatedInventions];
 
 export function getInventionById(id: string): Invention | undefined {
   return inventions.find((invention) => invention.id === id);

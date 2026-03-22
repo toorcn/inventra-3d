@@ -1,4 +1,5 @@
 import { getComponentsByInventionId } from "./invention-components";
+import { generatedModelDefinitions } from "./generated/models-generated";
 import type { GeometryDef } from "@/types";
 
 export interface ComponentModel {
@@ -84,8 +85,10 @@ export const modelDefinitions: ModelDefinition[] = [
   },
 ];
 
+const allModelDefinitions: ModelDefinition[] = [...modelDefinitions, ...generatedModelDefinitions];
+
 export function getModelDefinitionByInventionId(
   inventionId: string,
 ): ModelDefinition | undefined {
-  return modelDefinitions.find((model) => model.inventionId === inventionId);
+  return allModelDefinitions.find((model) => model.inventionId === inventionId);
 }
