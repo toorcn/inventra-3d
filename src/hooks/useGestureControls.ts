@@ -312,7 +312,7 @@ export function useGestureControls({
           cannedGesturesClassifierOptions: {
             categoryAllowlist: ["Open_Palm", "Thumb_Down", "Thumb_Up"],
             maxResults: 1,
-            scoreThreshold: 0.7,
+            scoreThreshold: 0.5,
           },
           numHands: 1,
           runningMode: "VIDEO",
