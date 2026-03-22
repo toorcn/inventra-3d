@@ -5,7 +5,8 @@ import { InventionCard } from "@/components/discovery/InventionCard";
 import { InventionDetail } from "@/components/discovery/InventionDetail";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { CategoryId, Invention } from "@/types";
-import { Globe2 } from "lucide-react";
+import { Globe2, Plus } from "lucide-react";
+import Link from "next/link";
 
 interface SidePanelProps {
   inventions: Invention[];
@@ -37,9 +38,18 @@ export function SidePanel({
             <Globe2 className="size-5 text-[var(--accent-gold)]" />
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Inventions</h2>
           </div>
-          <span className="rounded-full bg-[var(--accent-gold)]/15 px-2.5 py-0.5 text-xs font-medium text-[var(--accent-gold-light)]">
-            {inventions.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[var(--accent-gold)]/15 px-2.5 py-0.5 text-xs font-medium text-[var(--accent-gold-light)]">
+              {inventions.length}
+            </span>
+            <Link
+              href="/ingest"
+              className="flex size-7 items-center justify-center rounded-lg bg-[var(--accent-gold)]/15 text-[var(--accent-gold)] hover:bg-[var(--accent-gold)]/25 transition-colors"
+              title="Add invention from patent"
+            >
+              <Plus className="size-4" />
+            </Link>
+          </div>
         </div>
 
         <SearchInput
