@@ -129,6 +129,8 @@ export function useExpert({ inventionId, componentId, viewerState, activeVoiceSe
       setIsLoading(true);
       setIsSpeaking(true);
 
+      console.info("[InventorNet][Expert][Client] Stage: sending chat request");
+
       try {
         const response = await fetch("/api/chat", {
           method: "POST",
@@ -141,6 +143,11 @@ export function useExpert({ inventionId, componentId, viewerState, activeVoiceSe
             sessionId: activeVoiceSessionId ?? undefined,
             clientMessageId: userMsg.id,
           }),
+        });
+
+        console.info("[InventorNet][Expert][Client] Stage passed: chat response received", {
+          ok: response.ok,
+          status: response.status,
         });
 
         const payload = (await response.json()) as ChatResponse | { error?: string };
@@ -162,6 +169,9 @@ export function useExpert({ inventionId, componentId, viewerState, activeVoiceSe
 
         appendServerMessages([assistantMsg]);
         if (actions.length) {
+          console.info("[InventorNet][Expert][Client] Stage: dispatching expert actions", {
+            actions,
+          });
           onActions?.(actions);
         }
 
@@ -186,6 +196,7 @@ export function useExpert({ inventionId, componentId, viewerState, activeVoiceSe
       } finally {
         setIsLoading(false);
         setIsSpeaking(false);
+        console.info("[InventorNet][Expert][Client] Chat loading cleared");
       }
     },
     [activeVoiceSessionId, appendServerMessages, componentId, inventionId, onActions],

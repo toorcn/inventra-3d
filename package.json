@@ -13,6 +13,11 @@
     "test:fal-trellis": "node scripts/fal-trellis-test.mjs"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.82",
+    "@react-spring/three": "^10.0.3",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.0",
+    "@vercel/blob": "^2.3.1",
     "@mediapipe/tasks-vision": "0.10.17",
     "@napi-rs/canvas": "^0.1.97",
     "@react-spring/three": "^10.0.3",

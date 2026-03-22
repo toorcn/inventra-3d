@@ -1,11 +1,11 @@
 "use client";
 
 import { ChatPanel } from "@/components/expert/ChatPanel";
+import { Badge } from "@/components/ui/Badge";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { ComponentInfo } from "@/components/viewer/ComponentInfo";
 import ModelViewer from "@/components/viewer/ModelViewer";
 import { ViewerControls } from "@/components/viewer/ViewerControls";
-import { Badge } from "@/components/ui/Badge";
 import { getComponentsByInventionId } from "@/data/invention-components";
 import { getInventionById } from "@/data/inventions";
 import { useExpert } from "@/hooks/useExpert";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/gesture-controls";
 import type { ExpertAction, TranscriptDelivery, ViewerTransform } from "@/types";
 import { ArrowLeft } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -63,8 +64,6 @@ const INVENTION_IMAGES: Record<string, string> = {
   "automobile": "/inventions/automobile.svg",
   "kevlar": "/inventions/kevlar.svg",
 };
-
-import Image from "next/image";
 
 export default function InventionDetailPage() {
   const params = useParams<{ id: string }>();

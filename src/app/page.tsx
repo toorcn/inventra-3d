@@ -9,6 +9,7 @@ import { categories } from "@/data/categories";
 import { useGlobeCamera } from "@/hooks/useGlobeCamera";
 import { useGlobeInteraction } from "@/hooks/useGlobeInteraction";
 import { useInventions } from "@/hooks/useInventions";
+import Link from "next/link";
 import type { CountryHoverData, Invention } from "@/types";
 import { Play, RotateCcw } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -107,6 +108,12 @@ export default function Home() {
             <RotateCcw className="size-4" />
             Reset View
           </button>
+          <Link
+            href="/patent-extract"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[var(--bg-panel)] px-3 py-2 text-sm text-[var(--text-secondary)] backdrop-blur-xl transition-colors hover:text-white"
+          >
+            Patent Extractor
+          </Link>
         </div>
       </div>
 
@@ -191,9 +198,6 @@ export default function Home() {
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 z-20 rounded-xl border border-[var(--border-gold)] bg-[var(--bg-panel)] px-3 py-2 text-xs text-[var(--text-secondary)] backdrop-blur-xl">
-        {inventionState.filtered.length} inventions visible
-      </div>
     </main>
   );
 }

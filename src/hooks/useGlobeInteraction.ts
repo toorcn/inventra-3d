@@ -36,11 +36,24 @@ export function useGlobeInteraction(
   };
 
   const handleSearch = async (query: string) => {
+    console.info("[InventorNet][Search][Client] Search requested", {
+      query,
+    });
     inventionState.setSearchQuery(query);
     setIsSearching(true);
+
+    console.info("[InventorNet][Search][Client] Stage: parsing search query");
+
     try {
       const filters = await parseSearchQuery(query);
+
+      console.info("[InventorNet][Search][Client] Stage passed: search query parsed", {
+        filters,
+      });
+
       inventionState.resetFilters();
+
+      console.info("[InventorNet][Search][Client] Stage: applying parsed filters");
 
       filters.categories?.forEach((cat) => inventionState.toggleCategory(cat));
 
@@ -53,8 +66,18 @@ export function useGlobeInteraction(
           camera.flyToCountry(match.countryCode);
         }
       }
+
+      console.info("[InventorNet][Search][Client] Search flow complete", {
+        categoryCount: filters.categories?.length ?? 0,
+        country: filters.country ?? null,
+        region: filters.region ?? null,
+      });
+    } catch (error) {
+      console.error("[InventorNet][Search][Client] Search flow failed", error);
+      throw error;
     } finally {
       setIsSearching(false);
+      console.info("[InventorNet][Search][Client] Search loading cleared");
     }
   };
 
