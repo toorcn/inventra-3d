@@ -3,6 +3,7 @@ import { parsePdfTask } from "./tasks/parse-pdf";
 import { analyzePatentTask } from "./tasks/analyze-patent";
 import { identifyFiguresTask } from "./tasks/identify-figures";
 import { cropFiguresTask } from "./tasks/crop-figures";
+import { renderFiguresTask } from "./tasks/render-figures";
 import { generateMeshesTask } from "./tasks/generate-meshes";
 import { calculatePositionsTask } from "./tasks/calculate-positions";
 import { writeOutputTask } from "./tasks/write-output";
@@ -63,13 +64,24 @@ export const patentPipelineTask = task({
       .unwrap();
     logger.info("Figures cropped", { count: croppedFigures.imageUrls.length });
 
-    // Step 5: Generate .glb meshes from cropped figures
+    // Step 5: Render patent line drawings as photorealistic images
+    const rendered = await renderFiguresTask
+      .triggerAndWait({
+        imageUrls: croppedFigures.imageUrls,
+        figures: figureAnalysis.figures,
+        inventionTitle: patentAnalysis.title,
+        inventionDescription: patentAnalysis.description,
+      })
+      .unwrap();
+    logger.info("Figures rendered", { count: rendered.renderedUrls.length });
+
+    // Step 6: Generate .glb meshes from rendered images
     const meshes = await generateMeshesTask
-      .triggerAndWait({ imageUrls: croppedFigures.imageUrls })
+      .triggerAndWait({ imageUrls: rendered.renderedUrls })
       .unwrap();
     logger.info("Meshes generated", { count: meshes.meshes.length });
 
-    // Step 6: Calculate assembled/exploded positions
+    // Step 7: Calculate assembled/exploded positions
     const positions = await calculatePositionsTask
       .triggerAndWait({
         figures: figureAnalysis.figures,
@@ -77,7 +89,7 @@ export const patentPipelineTask = task({
       })
       .unwrap();
 
-    // Step 7: Write output files
+    // Step 8: Write output files
     const output = await writeOutputTask
       .triggerAndWait({
         patentAnalysis,

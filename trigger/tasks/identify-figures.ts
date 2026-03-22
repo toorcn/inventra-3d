@@ -76,31 +76,34 @@ export const identifyFiguresTask = task({
 
     const imagesToSend = payload.pages.slice(0, 8);
 
-    const systemPrompt = `You are a patent figure analysis expert specializing in identifying 3D-representable objects in patent documents.
+    const systemPrompt = `You are a patent figure analysis expert. Your job is to identify the key PHYSICAL SUBASSEMBLIES of the invention described in this patent, so they can be converted to 3D models.
 
-Analyze the patent figures and identify which ones show objects that can be converted to 3D models. Look for:
-- Exploded views showing subassemblies
-- Perspective drawings of physical components
-- Cross-section views of mechanical parts
+IMPORTANT DISTINCTION: You are NOT identifying individual figures to crop. Instead, you are identifying the key PHYSICAL PARTS/SUBASSEMBLIES of the invention. Each subassembly will be rendered as a separate 3D component.
 
-Do NOT include:
-- Flowcharts, circuit diagrams, or graphs
-- Pure text or table figures
-- Block diagrams or software architecture
+Based on the patent text and figures, identify the main physical subassemblies. For example, a ballpoint pen might have: "Pen Body/Barrel", "Ink Cartridge", "Pen Tip Assembly", "Writing Ball", "Cap".
 
-For each suitable figure, provide:
-- pageNumber: which page it's on (1-indexed)
-- boundingBox: approximate position as percentages (0-100) of page dimensions {x, y, width, height}
-- componentName: human-readable name (e.g., "Housing", "Rotor", "Circuit Board")
-- description: brief description of the component's function
-- materials: likely materials used
-- color: hex color that represents this component visually
+For each subassembly:
+- pageNumber: which page has the best drawing showing this part (1-indexed). If no clear drawing exists, use the page with the overall assembly view.
+- boundingBox: approximate position of this part in the figure as percentages (0-100) of page dimensions {x, y, width, height}. If imagined (not explicitly drawn), use the overall figure bounds.
+- componentName: human-readable name (e.g., "Pen Barrel", "Writing Ball", "Ink Cartridge")
+- description: what this component IS and what it LOOKS LIKE physically (shape, form factor). This will be used to generate a 3D rendering.
+- materials: likely materials (e.g., "stainless steel", "plastic", "ceramic")
+- color: realistic hex color for this component (e.g., silver metal = "#C0C0C0", black plastic = "#1a1a1a")
 - patentText: relevant text from the patent describing this component, or null
-- spatialHint: where this component sits relative to the overall assembly ("top", "bottom", "left", "right", "center", "front", "back")
+- spatialHint: where this component sits relative to the overall assembly
 
-IMPORTANT: Return at most 6 figures. Prioritize the most important/distinctive subassemblies.
-If the patent shows a single object from multiple angles, identify the distinct subassemblies rather than different views.
-You may also IMAGINE subassemblies that should exist based on the patent description even if they aren't explicitly shown in figures.`;
+STRICTLY EXCLUDE:
+- Graphs, charts, plots (e.g., "flow vs distance" plots)
+- Microscope/SEM images
+- Tables or data figures
+- Circuit diagrams, flowcharts, block diagrams
+- Any non-physical/abstract figures
+
+IMPORTANT GUIDELINES:
+- Return at most 6 subassemblies. Focus on the most visually distinctive and important parts.
+- PREFER to imagine realistic subassemblies based on patent description rather than cropping poor-quality line drawings.
+- Describe each part's PHYSICAL APPEARANCE (shape, form, texture) in the description field — this will be used to generate a photorealistic 3D rendering.
+- Use REALISTIC colors (metals are silver/grey, not bright colors).`;
 
     const userMessage = multimodalMessage(
       "Identify 3D-convertible figures and subassemblies in this patent:",
