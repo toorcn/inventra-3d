@@ -44,6 +44,24 @@ const COUNTRY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
   CN: { lat: 35.86, lng: 104.2 },
   JP: { lat: 36.2, lng: 138.25 },
   IT: { lat: 41.87, lng: 12.57 },
+  VN: { lat: 14.05, lng: 108.27 },
+  MY: { lat: 4.21, lng: 101.97 },
+  AU: { lat: -25.27, lng: 133.77 },
+  BR: { lat: -14.23, lng: -51.92 },
+  AR: { lat: -38.41, lng: -63.61 },
+  ZA: { lat: -30.55, lng: 22.93 },
+  MX: { lat: 23.63, lng: -102.55 },
+  CA: { lat: 56.13, lng: -106.34 },
+  KR: { lat: 35.9, lng: 127.76 },
+  IN: { lat: 20.59, lng: 78.96 },
+  TR: { lat: 38.96, lng: 35.24 },
+  EG: { lat: 26.82, lng: 30.8 },
+  RU: { lat: 61.52, lng: 105.31 },
+  IL: { lat: 31.04, lng: 34.85 },
+  IS: { lat: 64.96, lng: -19.02 },
+  NL: { lat: 52.13, lng: 5.29 },
+  FR: { lat: 46.22, lng: 2.21 },
+  IQ: { lat: 33.22, lng: 43.67 },
 };
 
 // Star polygon points for a 5-pointed star in a 40×40 viewBox
@@ -77,10 +95,6 @@ function createStarElement(
   starWrap.innerHTML = `
     <svg width="44" height="44" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
       <polygon points="${STAR_POINTS}" fill="#d4af55" opacity="0.92"/>
-      <text x="20" y="21.5" text-anchor="middle" dominant-baseline="middle"
-        font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#0a0b14">
-        ${count}
-      </text>
     </svg>
   `;
 

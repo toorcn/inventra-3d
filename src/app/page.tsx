@@ -14,6 +14,7 @@ import { Play, RotateCcw } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { InventionDetail } from "@/components/discovery/InventionDetail";
+import { TimelineSlider } from "@/components/globe/TimelineSlider";
 
 export default function Home() {
   const inventionState = useInventions();
@@ -131,6 +132,22 @@ export default function Home() {
         globeRef={globeRef}
         hoveredCountry={hoveredCountry}
       />
+
+      {/* Timeline Slider — Bottom Center */}
+      {!isRandomDiscoveryOpen && (
+        <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2 w-full max-w-xl px-4 animate-in fade-in duration-1000">
+          <div className="pointer-events-auto rounded-full border border-[var(--accent-gold)]/50 bg-white/[0.12] p-2 px-6 backdrop-blur-3xl shadow-[0_0_40px_rgba(212,175,85,0.2)] ring-1 ring-white/30 overflow-hidden relative">
+            <div className="absolute inset-x-0 top-0 h-px bg-white/20 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--accent-gold)]/15 to-transparent pointer-events-none" />
+            <TimelineSlider
+              minYear={-3500}
+              maxYear={2024}
+              currentYear={inventionState.yearRange[1]}
+              onChange={(year) => inventionState.setYearRange([-3500, year])}
+            />
+          </div>
+        </div>
+      )}
 
 
       {/* Side panel — LEFT side (Fixed Search/List) */}

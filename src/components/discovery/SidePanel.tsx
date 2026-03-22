@@ -52,21 +52,33 @@ export function SidePanel({
           </div>
         </div>
 
-        <SearchInput
-          value={searchValue}
-          onChange={onSearchChange}
-          onSubmit={onSearchSubmit}
-          placeholder="Try: renewable energy in Europe"
-          isLoading={isSearching}
-        />
-
         <div className="mt-3">
           <CategoryFilter activeCategories={activeCategories} onToggle={onToggleCategory} />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto p-2 scrollbar-hide">
         <div className="flex flex-col gap-2">
+          {/* Random Discovery "Column" Button */}
+          <button
+            onClick={() => {
+              const randomIndex = Math.floor(Math.random() * inventions.length);
+              onSelectInvention(inventions[randomIndex].id);
+            }}
+            className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-[var(--accent-gold)]/30 bg-gradient-to-br from-[var(--accent-gold)]/10 to-transparent p-3 text-left transition-all hover:border-[var(--accent-gold)] hover:bg-[var(--accent-gold)]/20"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--accent-gold)]/20 text-[var(--accent-gold)] group-hover:scale-110 transition-transform">
+              <span className="text-xl">🎲</span>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--accent-gold)]">Random Discovery</h3>
+              <p className="text-[10px] text-[var(--text-secondary)] opacity-80 italic">Surprise me with history...</p>
+            </div>
+            <div className="absolute -right-4 -top-4 size-12 rounded-full bg-[var(--accent-gold)]/10 blur-xl group-hover:bg-[var(--accent-gold)]/20 transition-all" />
+          </button>
+
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-[var(--border-gold)]/30 to-transparent my-1" />
+
           {inventions.map((inv) => (
             <InventionCard
               key={inv.id}

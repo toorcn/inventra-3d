@@ -3,35 +3,7 @@ import { categoryColorMap } from "@/data/categories";
 import { Box, Calendar, ChevronRight, Lightbulb, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-
-/* Map invention IDs to image file names in /public/inventions/ */
-const INVENTION_IMAGES: Record<string, string> = {
-  "light-bulb": "/inventions/light-bulb.png",
-  "telephone": "/inventions/telephone.png",
-  "printing-press": "/inventions/printing-press.png",
-  "steam-engine": "/inventions/steam-engine.png",
-  "compass": "/inventions/compass.png",
-  "wright-flyer": "/inventions/wright-flyer.png",
-  "tesla-coil": "/inventions/tesla-coil.png",
-  "gunpowder": "/inventions/gunpowder.png",
-  "iphone": "/inventions/iphone.png",
-  "penicillin": "/inventions/penicillin.png",
-  "dna-structure": "/inventions/dna-structure.png",
-  "solar-cell": "/inventions/solar-cell.png",
-  "crispr": "/inventions/crispr.png",
-  "transistor": "/inventions/transistor.png",
-  "world-wide-web": "/inventions/world-wide-web.png",
-  "jet-engine": "/inventions/jet-engine.png",
-  "dynamite": "/inventions/dynamite.png",
-  "mrna-vaccine": "/inventions/mrna-vaccine.svg",
-  "lithium-ion-battery": "/inventions/lithium-ion-battery.svg",
-  "bullet-train": "/inventions/bullet-train.svg",
-  "carbon-fiber": "/inventions/carbon-fiber.svg",
-  "radio": "/inventions/radio.svg",
-  "integrated-circuit": "/inventions/integrated-circuit.svg",
-  "automobile": "/inventions/automobile.svg",
-  "kevlar": "/inventions/kevlar.svg",
-};
+import { INVENTION_IMAGES } from "@/lib/inventionImages";
 
 interface CountryHoverPanelProps {
   data: CountryHoverData | null;

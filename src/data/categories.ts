@@ -12,6 +12,13 @@ export const categories: Category[] = [
     color: "#EF4444",
     icon: "Plane",
   },
+  { id: "medicine", name: "Medicine", color: "#EC4899", icon: "Stethoscope" },
+  { id: "science", name: "Science", color: "#8B5CF6", icon: "FlaskConical" },
+  { id: "agriculture", name: "Agriculture", color: "#10B981", icon: "Sprout" },
+  { id: "communication", name: "Communication", color: "#0EA5E9", icon: "MessageSquare" },
+  { id: "engineering", name: "Engineering", color: "#64748B", icon: "Cog" },
+  { id: "military", name: "Military", color: "#B91C1C", icon: "Shield" },
+  { id: "consumer-products", name: "Consumer Products", color: "#F59E0B", icon: "ShoppingBag" },
   { id: "other", name: "Other", color: "#9CA3AF", icon: "Package" },
 ];
 

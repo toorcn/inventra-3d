@@ -5,6 +5,13 @@ export type CategoryId =
   | "materials"
   | "computing"
   | "transportation"
+  | "medicine"
+  | "science"
+  | "agriculture"
+  | "communication"
+  | "engineering"
+  | "military"
+  | "consumer-products"
   | "other";
 
 export interface Invention {
@@ -278,5 +285,7 @@ export interface UseInventionsReturn {
   selectInvention: (id: string | null) => void;
   selectedCountry: string | null;
   selectCountry: (code: string | null) => void;
+  yearRange: [number, number];
+  setYearRange: (range: [number, number]) => void;
   resetFilters: () => void;
 }
