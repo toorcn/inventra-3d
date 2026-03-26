@@ -19,7 +19,7 @@ export interface WriteOutputResult {
   glbPaths: string[];
 }
 
-// PROJECT_ROOT is passed via payload since __dirname points to Trigger.dev's build output dir
+// PROJECT_ROOT is passed via payload since  __dirname points to Trigger.dev's build output dir
 
 export const writeOutputTask = task({
   id: "write-output",
